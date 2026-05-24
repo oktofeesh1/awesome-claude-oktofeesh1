@@ -59,7 +59,8 @@ describe("/api/registry/search", () => {
   });
 
   it("returns page metadata while preserving full-result facets", async () => {
-    const { GET } = await import("../apps/web/src/app/api/registry/search/route");
+    const { GET } =
+      await import("../apps/web/src/app/api/registry/search/route");
     const response = await GET(
       new Request(
         "https://heyclau.de/api/registry/search?q=fixture&limit=2&offset=2",
@@ -80,5 +81,39 @@ describe("/api/registry/search", () => {
       "fixture-c",
     ]);
     expect(body.facets.categories.mcp).toBe(3);
+  });
+
+  it("does not advertise an offset beyond the documented maximum", async () => {
+    searchIndexMock.entries = Array.from({ length: 10_001 }, (_, index) =>
+      makeEntry(`fixture-${index}`),
+    );
+
+    const { GET } =
+      await import("../apps/web/src/app/api/registry/search/route");
+    const cappedPage = await GET(
+      new Request(
+        "https://heyclau.de/api/registry/search?limit=50&offset=9990",
+        { headers: { origin: "https://heyclau.de" } },
+      ),
+    );
+
+    await expect(cappedPage.json()).resolves.toMatchObject({
+      count: 11,
+      total: 10_001,
+      nextOffset: 10_000,
+    });
+
+    const finalPage = await GET(
+      new Request(
+        "https://heyclau.de/api/registry/search?limit=50&offset=10000",
+        { headers: { origin: "https://heyclau.de" } },
+      ),
+    );
+
+    await expect(finalPage.json()).resolves.toMatchObject({
+      count: 1,
+      total: 10_001,
+      nextOffset: null,
+    });
   });
 });

@@ -8,6 +8,8 @@ import { createApiHandler, type InferApiQuery } from "@/lib/api/router";
 import { getSearchIndex } from "@/lib/content";
 import { cachedJsonResponse } from "@/lib/http-cache";
 
+const MAX_OFFSET = 10_000;
+
 export const GET = createApiHandler(
   "registry.search",
   async ({ request, query: parsedQuery }) => {
@@ -39,6 +41,7 @@ export const GET = createApiHandler(
     const matched = filterEntries(entries, filters);
     const results = matched.slice(offset, offset + limit);
     const facets = computeRegistrySearchFacets(entries, filters);
+    const nextOffset = Math.min(offset + limit, MAX_OFFSET);
 
     return cachedJsonResponse(
       request,
@@ -58,7 +61,10 @@ export const GET = createApiHandler(
         total: matched.length,
         limit,
         offset,
-        nextOffset: offset + limit < matched.length ? offset + limit : null,
+        nextOffset:
+          nextOffset < matched.length && nextOffset !== offset
+            ? nextOffset
+            : null,
         results,
         facets,
       },
