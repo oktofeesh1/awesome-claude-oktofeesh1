@@ -272,6 +272,11 @@ export const registryDiffQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(500).optional().default(100),
 });
 
+export const registryIntegrityQuerySchema = z.object({
+  artifact: z.string().trim().max(160).regex(/^\/?(?:[a-z0-9][a-z0-9._-]*\/)*(?:[a-z0-9][a-z0-9._-]*)$/).optional(),
+  hash: z.string().trim().toLowerCase().regex(/^[a-f0-9]{64}$/).optional(),
+});
+
 export const entryParamsSchema = z.object({
   category: safeSlugSchema,
   slug: safeSlugSchema,
@@ -694,6 +699,7 @@ export const apiRouteDefinitions = {
       binding: "API_REGISTRY_RATE_LIMIT",
     },
   }),
+  "registry.integrity": route({ id: "registry.integrity", method: "GET", path: "/api/registry/integrity", summary: "Registry artifact integrity verification", description: "Lists current registry artifact hashes and verifies submitted artifact/hash pairs against the deployed manifest.", tags: ["Registry"], originCheck: true, querySchema: registryIntegrityQuerySchema, rateLimit: { scope: "registry-integrity", limit: 120, windowMs: 60_000, binding: "API_REGISTRY_RATE_LIMIT" } }),
   "registry.entry": route({
     id: "registry.entry",
     method: "GET",
