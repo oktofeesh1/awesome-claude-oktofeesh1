@@ -21,6 +21,7 @@ export const GET = createApiHandler(
       claimStatus: requestedClaimStatus,
       sourceStatus: requestedSourceStatus,
       limit,
+      offset,
     } = parsedQuery as InferApiQuery<typeof registrySearchQuerySchema>;
 
     const filters: RegistrySearchFilterState = {
@@ -36,7 +37,7 @@ export const GET = createApiHandler(
 
     const entries = await getSearchIndex();
     const matched = filterEntries(entries, filters);
-    const results = matched.slice(0, limit);
+    const results = matched.slice(offset, offset + limit);
     const facets = computeRegistrySearchFacets(entries, filters);
 
     return cachedJsonResponse(
@@ -54,6 +55,10 @@ export const GET = createApiHandler(
           sourceStatus: requestedSourceStatus,
         },
         count: results.length,
+        total: matched.length,
+        limit,
+        offset,
+        nextOffset: offset + limit < matched.length ? offset + limit : null,
         results,
         facets,
       },

@@ -126,6 +126,7 @@ describe("OpenAPI route coverage", () => {
         expect.objectContaining({ name: "hasSafetyNotes", in: "query" }),
         expect.objectContaining({ name: "downloadTrust", in: "query" }),
         expect.objectContaining({ name: "claimStatus", in: "query" }),
+        expect.objectContaining({ name: "offset", in: "query" }),
       ]),
     );
     expect(
@@ -171,6 +172,30 @@ describe("OpenAPI route coverage", () => {
         "sourceStatus",
       ]),
     );
+  });
+
+  it("documents registry search pagination metadata", () => {
+    const searchResponse =
+      parsedSchema.paths["/api/registry/search"]?.get?.responses?.["200"];
+    const jsonContent = (
+      searchResponse?.content as Record<string, { schema?: unknown }> | undefined
+    )?.["application/json"];
+    const responseSchema = jsonContent?.schema as
+      | {
+        properties?: Record<
+          string,
+          { type?: string | string[] }
+        >;
+      }
+      | undefined;
+
+    expect(responseSchema?.properties?.total?.type).toBe("integer");
+    expect(responseSchema?.properties?.limit?.type).toBe("integer");
+    expect(responseSchema?.properties?.offset?.type).toBe("integer");
+    expect(responseSchema?.properties?.nextOffset?.type).toEqual([
+      "integer",
+      "null",
+    ]);
   });
 
   it("documents error envelopes, cacheable feeds, and registry trust signals", () => {

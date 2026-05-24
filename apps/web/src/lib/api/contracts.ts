@@ -237,6 +237,10 @@ export const registrySearchResponseSchema = z.object({
     })
     .optional(),
   count: z.number().int().nonnegative(),
+  total: z.number().int().nonnegative(),
+  limit: z.number().int().min(1).max(50),
+  offset: z.number().int().min(0).max(10_000),
+  nextOffset: z.number().int().min(0).max(10_000).nullable(),
   results: z.array(registrySearchResultSchema).max(50),
   facets: registrySearchFacetsSchema.optional(),
 });
@@ -260,6 +264,7 @@ export const registrySearchQuerySchema = z.object({
     .optional()
     .default("all"),
   limit: z.coerce.number().int().min(1).max(50).optional().default(20),
+  offset: z.coerce.number().int().min(0).max(10_000).optional().default(0),
 });
 
 export const registryDiffQuerySchema = z.object({

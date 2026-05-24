@@ -897,6 +897,16 @@ paths:
           required: false
           name: limit
           in: query
+        - schema:
+            type:
+              - integer
+              - "null"
+            minimum: 0
+            maximum: 10000
+            default: 0
+          required: false
+          name: offset
+          in: query
       responses:
         "200":
           description: Cacheable registry response with ETag support where applicable.
@@ -935,6 +945,23 @@ paths:
                   count:
                     type: integer
                     minimum: 0
+                  total:
+                    type: integer
+                    minimum: 0
+                  limit:
+                    type: integer
+                    minimum: 1
+                    maximum: 50
+                  offset:
+                    type: integer
+                    minimum: 0
+                    maximum: 10000
+                  nextOffset:
+                    type:
+                      - integer
+                      - "null"
+                    minimum: 0
+                    maximum: 10000
                   results:
                     type: array
                     items:
@@ -1185,6 +1212,10 @@ paths:
                   - category
                   - platform
                   - count
+                  - total
+                  - limit
+                  - offset
+                  - nextOffset
                   - results
         "400":
           description: Invalid JSON, invalid query, invalid payload, or invalid status transition.
