@@ -21,6 +21,7 @@ const apiRoutes = [
   "/api/registry/feed",
   "/api/registry/trending",
   "/api/registry/diff",
+  "/api/registry/integrity",
   "/api/registry/entries/{category}/{slug}",
   "/api/registry/entries/{category}/{slug}/llms",
   "/api/mcp",
