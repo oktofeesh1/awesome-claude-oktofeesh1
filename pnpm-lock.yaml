@@ -11,7 +11,7 @@ overrides:
   hono: 4.12.22
   ip-address: 10.2.0
   postcss: 8.5.15
-  ws: 8.20.1
+  ws: 8.21.0
 
 importers:
 
@@ -55,11 +55,11 @@ importers:
         specifier: 19.2.6
         version: 19.2.6(react@19.2.6)
       react-email:
-        specifier: 6.3.0
-        version: 6.3.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+        specifier: 6.3.2
+        version: 6.3.2(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       safety-agent-cli:
         specifier: 0.1.6
-        version: 0.1.6(ws@8.20.1)
+        version: 0.1.6(ws@8.21.0)
       tsx:
         specifier: 4.22.3
         version: 4.22.3
@@ -3468,7 +3468,7 @@ packages:
   isomorphic-ws@5.0.0:
     resolution: {integrity: sha512-muId7Zzn9ywDsyXgTIafTry2sV3nySZeUDe6YedVd1Hvuuep5AsIlqK+XefWpYTyJG5e503F2xIuT2lcU6rCSw==}
     peerDependencies:
-      ws: 8.20.1
+      ws: 8.21.0
 
   jackspeak@4.2.3:
     resolution: {integrity: sha512-ykkVRwrYvFm1nb2AJfKKYPr0emF6IiXDYUaFx4Zn9ZuIH7MrzEZ3sD5RlqGXNRpHtvUHJyOnCEFxOlNDtGo7wg==}
@@ -3969,8 +3969,8 @@ packages:
     peerDependencies:
       react: ^19.2.6
 
-  react-email@6.3.0:
-    resolution: {integrity: sha512-IIwl63lWo91104T8zlwFhBQvFQgfIc/NCruacE4uI1e8hkzpxKwk0d6abMzTK1qniQDK7STbn5YB+Tkhsnjz9Q==}
+  react-email@6.3.2:
+    resolution: {integrity: sha512-ZzmrwM+QLzfs/EZBnFZRMZwT3Kfvp46zIMCLsGn/rtRBh9ocRJDKHcnV0JWJyc0AVJTdPDHeFNBWap6N/3Dnhg==}
     engines: {node: '>=20.0.0'}
     hasBin: true
     peerDependencies:
@@ -4515,8 +4515,8 @@ packages:
   wrappy@1.0.2:
     resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
 
-  ws@8.20.1:
-    resolution: {integrity: sha512-It4dO0K5v//JtTXuPkfEOaI3uUN87iYPnqo/ZzqCoG3g8uhA66QUMs/SrM0YK7/NAu+r4LMh/9dq2A7k+rHs+w==}
+  ws@8.21.0:
+    resolution: {integrity: sha512-Vsp28b7DRcimFQvrqu2Wek3z1iYxDCWqHYB8Qsnk/S4RfaCQzPGPyBNuVjJV3cd6UiKtUtp6sNM77gWvzcCH+g==}
     engines: {node: '>=10.0.0'}
     peerDependencies:
       bufferutil: ^4.0.1
@@ -5515,7 +5515,7 @@ snapshots:
       - debug
       - supports-color
 
-  '@daytonaio/sdk@0.138.0(ws@8.20.1)':
+  '@daytonaio/sdk@0.138.0(ws@8.21.0)':
     dependencies:
       '@aws-sdk/client-s3': 3.984.0
       '@aws-sdk/lib-storage': 3.1050.0(@aws-sdk/client-s3@3.984.0)
@@ -5528,7 +5528,7 @@ snapshots:
       expand-tilde: 2.0.2
       fast-glob: 3.3.3
       form-data: 4.0.5
-      isomorphic-ws: 5.0.0(ws@8.20.1)
+      isomorphic-ws: 5.0.0(ws@8.21.0)
       pathe: 2.0.3
       shell-quote: 1.8.3
       tar: 7.5.15
@@ -7798,7 +7798,7 @@ snapshots:
       cors: 2.8.6
       debug: 4.4.3
       engine.io-parser: 5.2.3
-      ws: 8.20.1
+      ws: 8.21.0
     transitivePeerDependencies:
       - bufferutil
       - supports-color
@@ -8302,9 +8302,9 @@ snapshots:
 
   isexe@3.1.5: {}
 
-  isomorphic-ws@5.0.0(ws@8.20.1):
+  isomorphic-ws@5.0.0(ws@8.21.0):
     dependencies:
-      ws: 8.20.1
+      ws: 8.21.0
 
   jackspeak@4.2.3:
     dependencies:
@@ -8464,7 +8464,7 @@ snapshots:
       sharp: 0.34.5
       undici: 7.24.8
       workerd: 1.20260520.1
-      ws: 8.20.1
+      ws: 8.21.0
       youch: 4.1.0-beta.10
     transitivePeerDependencies:
       - bufferutil
@@ -8740,7 +8740,7 @@ snapshots:
       react: 19.2.6
       scheduler: 0.27.0
 
-  react-email@6.3.0(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
+  react-email@6.3.2(react-dom@19.2.6(react@19.2.6))(react@19.2.6):
     dependencies:
       '@babel/parser': 7.27.0
       '@babel/traverse': 7.27.0
@@ -8855,9 +8855,9 @@ snapshots:
 
   safer-buffer@2.1.2: {}
 
-  safety-agent-cli@0.1.6(ws@8.20.1):
+  safety-agent-cli@0.1.6(ws@8.21.0):
     dependencies:
-      safety-agent: 0.1.6(ws@8.20.1)
+      safety-agent: 0.1.6(ws@8.21.0)
     transitivePeerDependencies:
       - '@napi-rs/canvas'
       - aws-crt
@@ -8865,9 +8865,9 @@ snapshots:
       - supports-color
       - ws
 
-  safety-agent@0.1.6(ws@8.20.1):
+  safety-agent@0.1.6(ws@8.21.0):
     dependencies:
-      '@daytonaio/sdk': 0.138.0(ws@8.20.1)
+      '@daytonaio/sdk': 0.138.0(ws@8.21.0)
       ipaddr.js: 2.4.0
       unpdf: 1.6.2
     transitivePeerDependencies:
@@ -9007,7 +9007,7 @@ snapshots:
   socket.io-adapter@2.5.6:
     dependencies:
       debug: 4.4.3
-      ws: 8.20.1
+      ws: 8.21.0
     transitivePeerDependencies:
       - bufferutil
       - supports-color
@@ -9316,7 +9316,7 @@ snapshots:
 
   wrappy@1.0.2: {}
 
-  ws@8.20.1: {}
+  ws@8.21.0: {}
 
   xml-naming@0.1.0: {}
 
