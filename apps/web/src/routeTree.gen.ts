@@ -14,7 +14,6 @@ import { Route as TrendingRouteImport } from "./routes/trending";
 import { Route as ToolsRouteImport } from "./routes/tools";
 import { Route as SubscriptionsRouteImport } from "./routes/subscriptions";
 import { Route as SubmitRouteImport } from "./routes/submit";
-import { Route as SubmissionsRouteImport } from "./routes/submissions";
 import { Route as SitemapDotxmlRouteImport } from "./routes/sitemap[.]xml";
 import { Route as RobotsDottxtRouteImport } from "./routes/robots[.]txt";
 import { Route as QualityRouteImport } from "./routes/quality";
@@ -45,14 +44,12 @@ import { Route as ValidatorsSkillPackageRouteImport } from "./routes/validators.
 import { Route as ValidatorsMcpConfigRouteImport } from "./routes/validators.mcp-config";
 import { Route as ToolsSubmitRouteImport } from "./routes/tools.submit";
 import { Route as ToolsSlugRouteImport } from "./routes/tools.$slug";
-import { Route as SubmissionsIdRouteImport } from "./routes/submissions.$id";
 import { Route as JobsPostRouteImport } from "./routes/jobs.post";
 import { Route as JobsSlugRouteImport } from "./routes/jobs.$slug";
 import { Route as IntegrationsSlugRouteImport } from "./routes/integrations.$slug";
 import { Route as FeedsSlugRouteImport } from "./routes/feeds.$slug";
 import { Route as ContributorsSlugRouteImport } from "./routes/contributors.$slug";
 import { Route as BestSlugRouteImport } from "./routes/best.$slug";
-import { Route as ApiSubmissionsRouteImport } from "./routes/api/submissions";
 import { Route as ApiOgRouteImport } from "./routes/api/og";
 import { Route as ApiMcpRouteImport } from "./routes/api/mcp";
 import { Route as ApiListingLeadsRouteImport } from "./routes/api/listing-leads";
@@ -66,7 +63,6 @@ import { Route as OgCategorySlugRouteImport } from "./routes/og.$category.$slug"
 import { Route as EntryCategorySlugRouteImport } from "./routes/entry.$category.$slug";
 import { Route as ApiVotesToggleRouteImport } from "./routes/api/votes/toggle";
 import { Route as ApiVotesQueryRouteImport } from "./routes/api/votes/query";
-import { Route as ApiSubmissionsQueueRouteImport } from "./routes/api/submissions/queue";
 import { Route as ApiSubmissionsPreflightRouteImport } from "./routes/api/submissions/preflight";
 import { Route as ApiRegistryTrendingRouteImport } from "./routes/api/registry/trending";
 import { Route as ApiRegistrySearchRouteImport } from "./routes/api/registry/search";
@@ -116,11 +112,6 @@ const SubscriptionsRoute = SubscriptionsRouteImport.update({
 const SubmitRoute = SubmitRouteImport.update({
   id: "/submit",
   path: "/submit",
-  getParentRoute: () => rootRouteImport,
-} as any);
-const SubmissionsRoute = SubmissionsRouteImport.update({
-  id: "/submissions",
-  path: "/submissions",
   getParentRoute: () => rootRouteImport,
 } as any);
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
@@ -273,11 +264,6 @@ const ToolsSlugRoute = ToolsSlugRouteImport.update({
   path: "/$slug",
   getParentRoute: () => ToolsRoute,
 } as any);
-const SubmissionsIdRoute = SubmissionsIdRouteImport.update({
-  id: "/$id",
-  path: "/$id",
-  getParentRoute: () => SubmissionsRoute,
-} as any);
 const JobsPostRoute = JobsPostRouteImport.update({
   id: "/jobs/post",
   path: "/jobs/post",
@@ -307,11 +293,6 @@ const BestSlugRoute = BestSlugRouteImport.update({
   id: "/$slug",
   path: "/$slug",
   getParentRoute: () => BestRoute,
-} as any);
-const ApiSubmissionsRoute = ApiSubmissionsRouteImport.update({
-  id: "/api/submissions",
-  path: "/api/submissions",
-  getParentRoute: () => rootRouteImport,
 } as any);
 const ApiOgRoute = ApiOgRouteImport.update({
   id: "/api/og",
@@ -378,15 +359,10 @@ const ApiVotesQueryRoute = ApiVotesQueryRouteImport.update({
   path: "/api/votes/query",
   getParentRoute: () => rootRouteImport,
 } as any);
-const ApiSubmissionsQueueRoute = ApiSubmissionsQueueRouteImport.update({
-  id: "/queue",
-  path: "/queue",
-  getParentRoute: () => ApiSubmissionsRoute,
-} as any);
 const ApiSubmissionsPreflightRoute = ApiSubmissionsPreflightRouteImport.update({
-  id: "/preflight",
-  path: "/preflight",
-  getParentRoute: () => ApiSubmissionsRoute,
+  id: "/api/submissions/preflight",
+  path: "/api/submissions/preflight",
+  getParentRoute: () => rootRouteImport,
 } as any);
 const ApiRegistryTrendingRoute = ApiRegistryTrendingRouteImport.update({
   id: "/api/registry/trending",
@@ -536,7 +512,6 @@ export interface FileRoutesByFullPath {
   "/quality": typeof QualityRoute;
   "/robots.txt": typeof RobotsDottxtRoute;
   "/sitemap.xml": typeof SitemapDotxmlRoute;
-  "/submissions": typeof SubmissionsRouteWithChildren;
   "/submit": typeof SubmitRoute;
   "/subscriptions": typeof SubscriptionsRoute;
   "/tools": typeof ToolsRouteWithChildren;
@@ -551,14 +526,12 @@ export interface FileRoutesByFullPath {
   "/api/listing-leads": typeof ApiListingLeadsRoute;
   "/api/mcp": typeof ApiMcpRoute;
   "/api/og": typeof ApiOgRoute;
-  "/api/submissions": typeof ApiSubmissionsRouteWithChildren;
   "/best/$slug": typeof BestSlugRoute;
   "/contributors/$slug": typeof ContributorsSlugRoute;
   "/feeds/$slug": typeof FeedsSlugRoute;
   "/integrations/$slug": typeof IntegrationsSlugRoute;
   "/jobs/$slug": typeof JobsSlugRoute;
   "/jobs/post": typeof JobsPostRoute;
-  "/submissions/$id": typeof SubmissionsIdRoute;
   "/tools/$slug": typeof ToolsSlugRoute;
   "/tools/submit": typeof ToolsSubmitRoute;
   "/validators/mcp-config": typeof ValidatorsMcpConfigRoute;
@@ -580,7 +553,6 @@ export interface FileRoutesByFullPath {
   "/api/registry/search": typeof ApiRegistrySearchRoute;
   "/api/registry/trending": typeof ApiRegistryTrendingRoute;
   "/api/submissions/preflight": typeof ApiSubmissionsPreflightRoute;
-  "/api/submissions/queue": typeof ApiSubmissionsQueueRoute;
   "/api/votes/query": typeof ApiVotesQueryRoute;
   "/api/votes/toggle": typeof ApiVotesToggleRoute;
   "/entry/$category/$slug": typeof EntryCategorySlugRoute;
@@ -621,7 +593,6 @@ export interface FileRoutesByTo {
   "/quality": typeof QualityRoute;
   "/robots.txt": typeof RobotsDottxtRoute;
   "/sitemap.xml": typeof SitemapDotxmlRoute;
-  "/submissions": typeof SubmissionsRouteWithChildren;
   "/submit": typeof SubmitRoute;
   "/subscriptions": typeof SubscriptionsRoute;
   "/tools": typeof ToolsRouteWithChildren;
@@ -636,14 +607,12 @@ export interface FileRoutesByTo {
   "/api/listing-leads": typeof ApiListingLeadsRoute;
   "/api/mcp": typeof ApiMcpRoute;
   "/api/og": typeof ApiOgRoute;
-  "/api/submissions": typeof ApiSubmissionsRouteWithChildren;
   "/best/$slug": typeof BestSlugRoute;
   "/contributors/$slug": typeof ContributorsSlugRoute;
   "/feeds/$slug": typeof FeedsSlugRoute;
   "/integrations/$slug": typeof IntegrationsSlugRoute;
   "/jobs/$slug": typeof JobsSlugRoute;
   "/jobs/post": typeof JobsPostRoute;
-  "/submissions/$id": typeof SubmissionsIdRoute;
   "/tools/$slug": typeof ToolsSlugRoute;
   "/tools/submit": typeof ToolsSubmitRoute;
   "/validators/mcp-config": typeof ValidatorsMcpConfigRoute;
@@ -665,7 +634,6 @@ export interface FileRoutesByTo {
   "/api/registry/search": typeof ApiRegistrySearchRoute;
   "/api/registry/trending": typeof ApiRegistryTrendingRoute;
   "/api/submissions/preflight": typeof ApiSubmissionsPreflightRoute;
-  "/api/submissions/queue": typeof ApiSubmissionsQueueRoute;
   "/api/votes/query": typeof ApiVotesQueryRoute;
   "/api/votes/toggle": typeof ApiVotesToggleRoute;
   "/entry/$category/$slug": typeof EntryCategorySlugRoute;
@@ -707,7 +675,6 @@ export interface FileRoutesById {
   "/quality": typeof QualityRoute;
   "/robots.txt": typeof RobotsDottxtRoute;
   "/sitemap.xml": typeof SitemapDotxmlRoute;
-  "/submissions": typeof SubmissionsRouteWithChildren;
   "/submit": typeof SubmitRoute;
   "/subscriptions": typeof SubscriptionsRoute;
   "/tools": typeof ToolsRouteWithChildren;
@@ -722,14 +689,12 @@ export interface FileRoutesById {
   "/api/listing-leads": typeof ApiListingLeadsRoute;
   "/api/mcp": typeof ApiMcpRoute;
   "/api/og": typeof ApiOgRoute;
-  "/api/submissions": typeof ApiSubmissionsRouteWithChildren;
   "/best/$slug": typeof BestSlugRoute;
   "/contributors/$slug": typeof ContributorsSlugRoute;
   "/feeds/$slug": typeof FeedsSlugRoute;
   "/integrations/$slug": typeof IntegrationsSlugRoute;
   "/jobs/$slug": typeof JobsSlugRoute;
   "/jobs/post": typeof JobsPostRoute;
-  "/submissions/$id": typeof SubmissionsIdRoute;
   "/tools/$slug": typeof ToolsSlugRoute;
   "/tools/submit": typeof ToolsSubmitRoute;
   "/validators/mcp-config": typeof ValidatorsMcpConfigRoute;
@@ -751,7 +716,6 @@ export interface FileRoutesById {
   "/api/registry/search": typeof ApiRegistrySearchRoute;
   "/api/registry/trending": typeof ApiRegistryTrendingRoute;
   "/api/submissions/preflight": typeof ApiSubmissionsPreflightRoute;
-  "/api/submissions/queue": typeof ApiSubmissionsQueueRoute;
   "/api/votes/query": typeof ApiVotesQueryRoute;
   "/api/votes/toggle": typeof ApiVotesToggleRoute;
   "/entry/$category/$slug": typeof EntryCategorySlugRoute;
@@ -794,7 +758,6 @@ export interface FileRouteTypes {
     | "/quality"
     | "/robots.txt"
     | "/sitemap.xml"
-    | "/submissions"
     | "/submit"
     | "/subscriptions"
     | "/tools"
@@ -809,14 +772,12 @@ export interface FileRouteTypes {
     | "/api/listing-leads"
     | "/api/mcp"
     | "/api/og"
-    | "/api/submissions"
     | "/best/$slug"
     | "/contributors/$slug"
     | "/feeds/$slug"
     | "/integrations/$slug"
     | "/jobs/$slug"
     | "/jobs/post"
-    | "/submissions/$id"
     | "/tools/$slug"
     | "/tools/submit"
     | "/validators/mcp-config"
@@ -838,7 +799,6 @@ export interface FileRouteTypes {
     | "/api/registry/search"
     | "/api/registry/trending"
     | "/api/submissions/preflight"
-    | "/api/submissions/queue"
     | "/api/votes/query"
     | "/api/votes/toggle"
     | "/entry/$category/$slug"
@@ -879,7 +839,6 @@ export interface FileRouteTypes {
     | "/quality"
     | "/robots.txt"
     | "/sitemap.xml"
-    | "/submissions"
     | "/submit"
     | "/subscriptions"
     | "/tools"
@@ -894,14 +853,12 @@ export interface FileRouteTypes {
     | "/api/listing-leads"
     | "/api/mcp"
     | "/api/og"
-    | "/api/submissions"
     | "/best/$slug"
     | "/contributors/$slug"
     | "/feeds/$slug"
     | "/integrations/$slug"
     | "/jobs/$slug"
     | "/jobs/post"
-    | "/submissions/$id"
     | "/tools/$slug"
     | "/tools/submit"
     | "/validators/mcp-config"
@@ -923,7 +880,6 @@ export interface FileRouteTypes {
     | "/api/registry/search"
     | "/api/registry/trending"
     | "/api/submissions/preflight"
-    | "/api/submissions/queue"
     | "/api/votes/query"
     | "/api/votes/toggle"
     | "/entry/$category/$slug"
@@ -964,7 +920,6 @@ export interface FileRouteTypes {
     | "/quality"
     | "/robots.txt"
     | "/sitemap.xml"
-    | "/submissions"
     | "/submit"
     | "/subscriptions"
     | "/tools"
@@ -979,14 +934,12 @@ export interface FileRouteTypes {
     | "/api/listing-leads"
     | "/api/mcp"
     | "/api/og"
-    | "/api/submissions"
     | "/best/$slug"
     | "/contributors/$slug"
     | "/feeds/$slug"
     | "/integrations/$slug"
     | "/jobs/$slug"
     | "/jobs/post"
-    | "/submissions/$id"
     | "/tools/$slug"
     | "/tools/submit"
     | "/validators/mcp-config"
@@ -1008,7 +961,6 @@ export interface FileRouteTypes {
     | "/api/registry/search"
     | "/api/registry/trending"
     | "/api/submissions/preflight"
-    | "/api/submissions/queue"
     | "/api/votes/query"
     | "/api/votes/toggle"
     | "/entry/$category/$slug"
@@ -1050,7 +1002,6 @@ export interface RootRouteChildren {
   QualityRoute: typeof QualityRoute;
   RobotsDottxtRoute: typeof RobotsDottxtRoute;
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute;
-  SubmissionsRoute: typeof SubmissionsRouteWithChildren;
   SubmitRoute: typeof SubmitRoute;
   SubscriptionsRoute: typeof SubscriptionsRoute;
   ToolsRoute: typeof ToolsRouteWithChildren;
@@ -1064,7 +1015,6 @@ export interface RootRouteChildren {
   ApiListingLeadsRoute: typeof ApiListingLeadsRoute;
   ApiMcpRoute: typeof ApiMcpRoute;
   ApiOgRoute: typeof ApiOgRoute;
-  ApiSubmissionsRoute: typeof ApiSubmissionsRouteWithChildren;
   JobsSlugRoute: typeof JobsSlugRoute;
   JobsPostRoute: typeof JobsPostRoute;
   JobsIndexRoute: typeof JobsIndexRoute;
@@ -1080,6 +1030,7 @@ export interface RootRouteChildren {
   ApiRegistryManifestRoute: typeof ApiRegistryManifestRoute;
   ApiRegistrySearchRoute: typeof ApiRegistrySearchRoute;
   ApiRegistryTrendingRoute: typeof ApiRegistryTrendingRoute;
+  ApiSubmissionsPreflightRoute: typeof ApiSubmissionsPreflightRoute;
   ApiVotesQueryRoute: typeof ApiVotesQueryRoute;
   ApiVotesToggleRoute: typeof ApiVotesToggleRoute;
   EntryCategorySlugRoute: typeof EntryCategorySlugRoute;
@@ -1128,13 +1079,6 @@ declare module "@tanstack/react-router" {
       path: "/submit";
       fullPath: "/submit";
       preLoaderRoute: typeof SubmitRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
-    "/submissions": {
-      id: "/submissions";
-      path: "/submissions";
-      fullPath: "/submissions";
-      preLoaderRoute: typeof SubmissionsRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     "/sitemap.xml": {
@@ -1347,13 +1291,6 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof ToolsSlugRouteImport;
       parentRoute: typeof ToolsRoute;
     };
-    "/submissions/$id": {
-      id: "/submissions/$id";
-      path: "/$id";
-      fullPath: "/submissions/$id";
-      preLoaderRoute: typeof SubmissionsIdRouteImport;
-      parentRoute: typeof SubmissionsRoute;
-    };
     "/jobs/post": {
       id: "/jobs/post";
       path: "/jobs/post";
@@ -1395,13 +1332,6 @@ declare module "@tanstack/react-router" {
       fullPath: "/best/$slug";
       preLoaderRoute: typeof BestSlugRouteImport;
       parentRoute: typeof BestRoute;
-    };
-    "/api/submissions": {
-      id: "/api/submissions";
-      path: "/api/submissions";
-      fullPath: "/api/submissions";
-      preLoaderRoute: typeof ApiSubmissionsRouteImport;
-      parentRoute: typeof rootRouteImport;
     };
     "/api/og": {
       id: "/api/og";
@@ -1494,19 +1424,12 @@ declare module "@tanstack/react-router" {
       preLoaderRoute: typeof ApiVotesQueryRouteImport;
       parentRoute: typeof rootRouteImport;
     };
-    "/api/submissions/queue": {
-      id: "/api/submissions/queue";
-      path: "/queue";
-      fullPath: "/api/submissions/queue";
-      preLoaderRoute: typeof ApiSubmissionsQueueRouteImport;
-      parentRoute: typeof ApiSubmissionsRoute;
-    };
     "/api/submissions/preflight": {
       id: "/api/submissions/preflight";
-      path: "/preflight";
+      path: "/api/submissions/preflight";
       fullPath: "/api/submissions/preflight";
       preLoaderRoute: typeof ApiSubmissionsPreflightRouteImport;
-      parentRoute: typeof ApiSubmissionsRoute;
+      parentRoute: typeof rootRouteImport;
     };
     "/api/registry/trending": {
       id: "/api/registry/trending";
@@ -1739,16 +1662,6 @@ const IntegrationsRouteChildren: IntegrationsRouteChildren = {
 
 const IntegrationsRouteWithChildren = IntegrationsRoute._addFileChildren(IntegrationsRouteChildren);
 
-interface SubmissionsRouteChildren {
-  SubmissionsIdRoute: typeof SubmissionsIdRoute;
-}
-
-const SubmissionsRouteChildren: SubmissionsRouteChildren = {
-  SubmissionsIdRoute: SubmissionsIdRoute,
-};
-
-const SubmissionsRouteWithChildren = SubmissionsRoute._addFileChildren(SubmissionsRouteChildren);
-
 interface ToolsRouteChildren {
   ToolsSlugRoute: typeof ToolsSlugRoute;
   ToolsSubmitRoute: typeof ToolsSubmitRoute;
@@ -1794,20 +1707,6 @@ const ApiJobsRouteChildren: ApiJobsRouteChildren = {
 };
 
 const ApiJobsRouteWithChildren = ApiJobsRoute._addFileChildren(ApiJobsRouteChildren);
-
-interface ApiSubmissionsRouteChildren {
-  ApiSubmissionsPreflightRoute: typeof ApiSubmissionsPreflightRoute;
-  ApiSubmissionsQueueRoute: typeof ApiSubmissionsQueueRoute;
-}
-
-const ApiSubmissionsRouteChildren: ApiSubmissionsRouteChildren = {
-  ApiSubmissionsPreflightRoute: ApiSubmissionsPreflightRoute,
-  ApiSubmissionsQueueRoute: ApiSubmissionsQueueRoute,
-};
-
-const ApiSubmissionsRouteWithChildren = ApiSubmissionsRoute._addFileChildren(
-  ApiSubmissionsRouteChildren,
-);
 
 interface ApiAdminJobsRouteChildren {
   ApiAdminJobsHealthRoute: typeof ApiAdminJobsHealthRoute;
@@ -1856,7 +1755,6 @@ const rootRouteChildren: RootRouteChildren = {
   QualityRoute: QualityRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
-  SubmissionsRoute: SubmissionsRouteWithChildren,
   SubmitRoute: SubmitRoute,
   SubscriptionsRoute: SubscriptionsRoute,
   ToolsRoute: ToolsRouteWithChildren,
@@ -1870,7 +1768,6 @@ const rootRouteChildren: RootRouteChildren = {
   ApiListingLeadsRoute: ApiListingLeadsRoute,
   ApiMcpRoute: ApiMcpRoute,
   ApiOgRoute: ApiOgRoute,
-  ApiSubmissionsRoute: ApiSubmissionsRouteWithChildren,
   JobsSlugRoute: JobsSlugRoute,
   JobsPostRoute: JobsPostRoute,
   JobsIndexRoute: JobsIndexRoute,
@@ -1886,6 +1783,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiRegistryManifestRoute: ApiRegistryManifestRoute,
   ApiRegistrySearchRoute: ApiRegistrySearchRoute,
   ApiRegistryTrendingRoute: ApiRegistryTrendingRoute,
+  ApiSubmissionsPreflightRoute: ApiSubmissionsPreflightRoute,
   ApiVotesQueryRoute: ApiVotesQueryRoute,
   ApiVotesToggleRoute: ApiVotesToggleRoute,
   EntryCategorySlugRoute: EntryCategorySlugRoute,

@@ -157,12 +157,12 @@ PR previews must pass artifact validation before merge:
 pnpm validate:deployment-artifacts -- --base-url https://<preview-host>
 ```
 
-CI resolves the preview URL automatically. For same-repo PRs with Cloudflare
-credentials, `.github/workflows/content-validation.yml` deploys the PR SHA to
-the shared `heyclaude-dev` Worker and validates that URL. If Cloudflare branch
-or PR previews publish GitHub Deployment statuses, CI validates the deployment
-`environment_url` instead. `DEPLOYMENT_ARTIFACT_BASE_URL` is only a local
-escape hatch for the validation script, not the pull-request merge gate.
+CI resolves the preview URL automatically from the Cloudflare GitHub integration.
+GitHub Actions does not deploy the Worker and does not need Cloudflare write
+tokens. For same-repo web, registry, or MCP PRs, missing GitHub Deployment or
+status URL evidence is a failed check, not an allow-missing pass.
+`DEPLOYMENT_ARTIFACT_BASE_URL` is only a local escape hatch for the validation
+script, not the pull-request merge gate.
 
 ## Newsletter (Resend)
 
@@ -185,30 +185,27 @@ longer a Next.js app.
 - `NEXT_PUBLIC_POLAR_SPONSORED_JOB_URL`
 - `NEXT_PUBLIC_POLAR_FEATURED_JOB_URL`
 - `NEXT_PUBLIC_POLAR_JOB_BOARD_URL`
-- `NEXT_PUBLIC_TURNSTILE_SITE_KEY`
-- `SUBMISSIONS_REQUIRE_TURNSTILE`
+- `VITE_SUBMISSION_GATE_URL` or `NEXT_PUBLIC_SUBMISSION_GATE_URL` set to the
+  submission-gate Worker origin:
+  `https://submission-gate-dev.heyclau.de` for development and
+  `https://submission-gate.heyclau.de` for production.
 
-Use separate production and development Turnstile widgets/secrets. The public
-site key is non-secret, but the matching `TURNSTILE_SECRET_KEY` must be set as a
-Worker secret for the same environment. If `SUBMISSIONS_REQUIRE_TURNSTILE=1`
-and the secret is missing, submission creation deliberately returns a 503 with a
-GitHub issue fallback URL rather than accepting unauthenticated writes.
-
-The development Worker uses Cloudflare's official always-pass Turnstile test
-site key in `wrangler.jsonc`, so it must be paired with the matching official
-test secret in the dev Worker only:
-
-```bash
-printf '%s' '1x0000000000000000000000000000000AA' |
-  pnpm --filter web exec wrangler secret put TURNSTILE_SECRET_KEY --env dev
-```
+Content submission writes are routed through the private submission gate; the
+public website only runs preflight and hands the contributor to GitHub auth.
 
 Required secrets, per environment:
 
 ```bash
-pnpm --filter web exec wrangler secret put TURNSTILE_SECRET_KEY
-pnpm --filter web exec wrangler secret put GITHUB_SUBMISSIONS_TOKEN
 pnpm --filter web exec wrangler secret put ADMIN_API_TOKEN
+```
+
+The submission-gate Worker also needs GitHub App secrets in its own Cloudflare
+environment. `GITHUB_APP_PRIVATE_KEY` must be PKCS#8 PEM, beginning with
+`-----BEGIN PRIVATE KEY-----`. Convert a GitHub RSA private key before storing
+it if needed:
+
+```bash
+openssl pkcs8 -topk8 -nocrypt -in github-app.pem -out github-app-pkcs8.pem
 ```
 
 For local development, copy `.dev.vars.example` to `.dev.vars` and fill values.

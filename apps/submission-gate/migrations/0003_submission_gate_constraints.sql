@@ -1,0 +1,2 @@
+-- Reserved for dev database migration history compatibility.
+-- The current 0001 schema already creates these constraints directly.

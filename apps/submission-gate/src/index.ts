@@ -1,0 +1,2120 @@
+import { Container } from "@cloudflare/containers";
+import { DurableObject } from "cloudflare:workers";
+
+import {
+  DEFAULT_REVIEW_MARKER,
+  LABELS,
+  PILOT_LABEL,
+  REVIEWABLE_PR_ACTIONS,
+} from "./constants";
+import {
+  buildContributorMdx,
+  buildDraftTarget,
+  draftFieldsFromBody,
+  slugify,
+} from "./drafts";
+import {
+  addLabels,
+  approvePullRequest,
+  buildGitHubAppAuthorizeUrl,
+  closeIssueOrPullRequest,
+  createUserForkContentPr,
+  exchangeGitHubUserCode,
+  getCommitValidationState,
+  getInstallationToken,
+  getPullRequest,
+  getRepositoryFileContent,
+  listPullRequestFiles,
+  listPullRequestsForCommit,
+  mergePullRequest,
+  parseRepo,
+  removeLabels,
+  upsertMarkerComment,
+} from "./github";
+import {
+  defaultManualDecision,
+  markerComment,
+  validationFailedDecision,
+  type GateDecision,
+  type GateVerdict,
+} from "./review";
+import {
+  decryptText,
+  encryptText,
+  randomToken,
+  signInternalPayload,
+  verifyGitHubWebhookSignature,
+  verifyInternalSignature,
+} from "./security";
+import {
+  consumeDraftUserToken,
+  createDraft,
+  getDraftUserToken,
+  getDraft,
+  getPrState,
+  insertAudit,
+  storeDraftUserToken,
+  updateDraftAuthState,
+  updateDraftStatus,
+  upsertPrState,
+  verifyDraftState,
+} from "./storage";
+
+type Env = {
+  PUBLIC_SITE_URL: string;
+  SUBMISSION_GATE_URL?: string;
+  PUBLIC_REPO: string;
+  ALLOWED_IMPORT_REPOS?: string;
+  PILOT_BASE_REF: string;
+  GITHUB_API_VERSION: string;
+  REVIEW_MARKER: string;
+  GITHUB_APP_CLIENT_ID?: string;
+  GITHUB_APP_CLIENT_SECRET?: string;
+  GITHUB_APP_ID?: string;
+  GITHUB_APP_PRIVATE_KEY?: string;
+  GITHUB_WEBHOOK_SECRET?: string;
+  INTERNAL_SHARED_SECRET?: string;
+  PRIVATE_GATE_REVIEW_URL?: string;
+  REQUIRED_VALIDATION_CHECKS?: string;
+  REQUIRED_STATUS_CONTEXTS?: string;
+  SUBMISSION_GATE_DB: D1Database;
+  SUBMISSION_GATE_AUDIT: R2Bucket;
+  SUBMISSION_REVIEW_QUEUE: Queue<Record<string, unknown>>;
+  SUBMISSION_IMPORT_QUEUE: Queue<Record<string, unknown>>;
+  SUBMISSION_LOCK: DurableObjectNamespace<SubmissionLock>;
+  SUBMISSION_IMPORT_RUNNER: DurableObjectNamespace<SubmissionImportRunner>;
+  ALLOWED_CORS_ORIGINS?: string;
+};
+
+type QueueMessage = {
+  kind: "review_pr" | "submit_draft" | "import_pr";
+  targetKey: string;
+  payload: Record<string, unknown>;
+};
+
+class SubmissionLockBusyError extends Error {
+  constructor(targetKey: string) {
+    super(`Submission lock is busy for ${targetKey}.`);
+    this.name = "SubmissionLockBusyError";
+  }
+}
+
+class SubmissionMergePendingError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "SubmissionMergePendingError";
+  }
+}
+
+const GATE_VERDICTS = new Set<GateVerdict>([
+  "merge",
+  "import",
+  "request_changes",
+  "close",
+  "manual",
+  "ignore",
+]);
+const TERMINAL_GATE_VERDICTS = new Set(["import", "close", "manual", "ignore"]);
+
+const PUBLIC_DRAFT_FIELD_REDACTIONS = new Set([
+  "address",
+  "address_1",
+  "address_2",
+  "address_line_1",
+  "address_line_2",
+  "city",
+  "contact_email",
+  "contact_phone",
+  "email",
+  "phone",
+  "postal_code",
+  "state",
+  "street_address",
+  "full_name",
+  "name_full",
+  "zip",
+  "zip_code",
+]);
+
+const DEFAULT_REQUIRED_VALIDATION_CHECKS = [
+  "validate-content",
+  "Superagent Security Scan",
+];
+const VALIDATION_WEBHOOK_EVENTS = new Set([
+  "check_run",
+  "check_suite",
+  "status",
+]);
+const REVIEWABLE_CHECK_ACTIONS = new Set([
+  "completed",
+  "rerequested",
+  "requested",
+]);
+const TRUSTED_RECHECK_ASSOCIATIONS = new Set([
+  "OWNER",
+  "MEMBER",
+  "COLLABORATOR",
+]);
+const MAINTAINER_IMPORT_BRANCH_PREFIX = "automation/submission-pr-";
+const DECISION_LABELS = [
+  LABELS.requestChanges,
+  LABELS.manual,
+  LABELS.close,
+  LABELS.merged,
+  LABELS.importOpen,
+  LABELS.superseded,
+];
+
+type ReviewTarget = {
+  repoFullName: string;
+  number: number;
+  baseRef: string;
+  headRepo?: string;
+  headRef?: string;
+  headSha?: string;
+  installationId?: number;
+};
+
+type DirectContentScope = {
+  filePath: string;
+  category: string;
+  slug: string;
+  status: string;
+};
+
+function isMaintainerImportRef(ref: string | undefined) {
+  return String(ref || "").startsWith(MAINTAINER_IMPORT_BRANCH_PREFIX);
+}
+
+function json(payload: unknown, init: ResponseInit = {}) {
+  const headers = new Headers(init.headers);
+  headers.set("content-type", "application/json; charset=utf-8");
+  headers.set("cache-control", "no-store");
+  headers.set("access-control-allow-methods", "GET,POST,OPTIONS");
+  headers.set(
+    "access-control-allow-headers",
+    "content-type,x-github-event,x-github-delivery,x-hub-signature-256,x-heyclaude-internal-signature",
+  );
+  return Response.json(payload, { ...init, headers });
+}
+
+function allowedCorsOrigins(env: Env) {
+  const configured = String(
+    env.ALLOWED_CORS_ORIGINS || env.PUBLIC_SITE_URL || "",
+  )
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  return configured.length ? configured : ["https://heyclau.de"];
+}
+
+function withCors(response: Response, request: Request, env: Env) {
+  const headers = new Headers(response.headers);
+  const allowedOrigins = allowedCorsOrigins(env);
+  const requestOrigin = request.headers.get("origin") || "";
+  const allowOrigin = allowedOrigins.includes(requestOrigin)
+    ? requestOrigin
+    : allowedOrigins[0];
+  headers.set("access-control-allow-origin", allowOrigin);
+  headers.set(
+    "vary",
+    headers.has("vary") ? `${headers.get("vary")}, Origin` : "Origin",
+  );
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function redactPublicDraftFields(fields: unknown) {
+  if (!isRecord(fields)) return {};
+  const scrubbed: Record<string, unknown> = { ...fields };
+  for (const key of Object.keys(scrubbed)) {
+    if (PUBLIC_DRAFT_FIELD_REDACTIONS.has(key.toLowerCase())) {
+      scrubbed[key] = "[redacted]";
+    }
+  }
+  return scrubbed;
+}
+
+function parseStoredDraftFields(
+  draftId: string,
+  fieldsJson: unknown,
+  fallback: Record<string, unknown> = {},
+) {
+  try {
+    const parsed = JSON.parse(String(fieldsJson || "{}"));
+    return isRecord(parsed) ? parsed : fallback;
+  } catch (error) {
+    console.warn("malformed draft fields json", { draftId, error });
+    return fallback;
+  }
+}
+
+function textResponse(body: string, init: ResponseInit = {}) {
+  const headers = new Headers(init.headers);
+  headers.set("content-type", "text/html; charset=utf-8");
+  headers.set("cache-control", "no-store");
+  return new Response(body, { ...init, headers });
+}
+
+function callbackUrl(request: Request) {
+  const url = new URL(request.url);
+  return `${url.origin}/auth/github/callback`;
+}
+
+function draftStatusUrl(request: Request, id: string) {
+  const url = new URL(request.url);
+  return `${url.origin}/drafts/${id}`;
+}
+
+function trimTrailingSlashes(value: unknown) {
+  const text = String(value || "");
+  let end = text.length;
+  while (end > 0 && text.charCodeAt(end - 1) === 47) {
+    end -= 1;
+  }
+  return text.slice(0, end);
+}
+
+async function putAuditObject(env: Env, key: string, payload: unknown) {
+  await env.SUBMISSION_GATE_AUDIT.put(key, JSON.stringify(payload, null, 2), {
+    httpMetadata: { contentType: "application/json" },
+  });
+}
+
+async function createDraftRoute(request: Request, env: Env) {
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return json(
+      {
+        ok: false,
+        error: "invalid_json",
+        message: "Draft request body must be valid JSON.",
+      },
+      { status: 400 },
+    );
+  }
+  if (!isRecord(body)) {
+    return json(
+      {
+        ok: false,
+        error: "invalid_draft",
+        message: "Draft request body must be a JSON object.",
+      },
+      { status: 400 },
+    );
+  }
+  if (
+    Object.hasOwn(body, "fields") &&
+    body.fields !== undefined &&
+    !isRecord(body.fields)
+  ) {
+    return json(
+      {
+        ok: false,
+        error: "invalid_draft",
+        message: "Draft fields must be a JSON object when provided.",
+      },
+      { status: 400 },
+    );
+  }
+  const fields = draftFieldsFromBody(body);
+  const baseRef = env.PILOT_BASE_REF || "submission-gate-pilot";
+  let target: ReturnType<typeof buildDraftTarget>;
+  try {
+    target = buildDraftTarget(fields, baseRef);
+  } catch (error) {
+    return json(
+      {
+        ok: false,
+        error: "invalid_draft",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Draft requires a supported category and slug.",
+      },
+      { status: 400 },
+    );
+  }
+  const id = `draft_${crypto.randomUUID()}`;
+  const state = randomToken();
+  await createDraft(env.SUBMISSION_GATE_DB, {
+    id,
+    status: "auth_required",
+    ...target,
+    fields,
+    authState: state,
+  });
+  await putAuditObject(env, `drafts/${id}.json`, {
+    id,
+    target,
+    fields: redactPublicDraftFields(fields),
+  });
+
+  const configured = Boolean(
+    env.GITHUB_APP_CLIENT_ID && env.GITHUB_APP_CLIENT_SECRET,
+  );
+  const authUrl = configured
+    ? buildGitHubAppAuthorizeUrl({
+        clientId: env.GITHUB_APP_CLIENT_ID || "",
+        callbackUrl: callbackUrl(request),
+        state: `${id}.${state}`,
+      })
+    : "";
+
+  return json({
+    ok: true,
+    configured,
+    draftId: id,
+    statusUrl: draftStatusUrl(request, id),
+    authUrl: authUrl || undefined,
+    target,
+    manualPr: configured
+      ? undefined
+      : {
+          targetPath: target.targetPath,
+          branchName: target.branchName,
+          baseRef: target.baseRef,
+          body: buildContributorMdx(fields),
+        },
+  });
+}
+
+async function getDraftRoute(env: Env, id: string) {
+  const draft = await getDraft(env.SUBMISSION_GATE_DB, id);
+  if (!draft) return json({ ok: false, error: "not_found" }, { status: 404 });
+  const fields = redactPublicDraftFields(
+    parseStoredDraftFields(id, draft.fieldsJson),
+  );
+  return json({
+    ok: true,
+    draft: {
+      ...draft,
+      fields,
+      fieldsJson: undefined,
+      authStateHash: undefined,
+    },
+  });
+}
+
+async function githubCallbackRoute(request: Request, env: Env) {
+  const url = new URL(request.url);
+  const code = url.searchParams.get("code") || "";
+  const providerError = url.searchParams.get("error") || "";
+  const state = url.searchParams.get("state") || "";
+  const [draftId, stateToken] = state.split(".");
+  if (
+    !draftId ||
+    !stateToken ||
+    !(await verifyDraftState(env.SUBMISSION_GATE_DB, draftId, stateToken))
+  ) {
+    return textResponse("Invalid or expired submission state.", {
+      status: 400,
+    });
+  }
+  if (providerError || !code) {
+    return textResponse("GitHub authorization was not completed.", {
+      status: 400,
+    });
+  }
+  if (!env.GITHUB_APP_CLIENT_ID || !env.GITHUB_APP_CLIENT_SECRET) {
+    return textResponse("GitHub App user auth is not configured.", {
+      status: 503,
+    });
+  }
+  if (!env.INTERNAL_SHARED_SECRET) {
+    return textResponse("Submission token handoff is not configured.", {
+      status: 503,
+    });
+  }
+
+  const userToken = await exchangeGitHubUserCode({
+    clientId: env.GITHUB_APP_CLIENT_ID,
+    clientSecret: env.GITHUB_APP_CLIENT_SECRET,
+    code,
+    callbackUrl: callbackUrl(request),
+  });
+  await storeDraftUserToken(env.SUBMISSION_GATE_DB, {
+    draftId,
+    encryptedToken: await encryptText(env.INTERNAL_SHARED_SECRET, userToken),
+    ttlSeconds: 900,
+  });
+  await updateDraftStatus(env.SUBMISSION_GATE_DB, draftId, "queued");
+  await env.SUBMISSION_REVIEW_QUEUE.send({
+    kind: "submit_draft",
+    targetKey: `draft:${draftId}`,
+    payload: { draftId },
+  });
+
+  return textResponse(
+    `<meta http-equiv="refresh" content="0; url=${draftStatusUrl(request, draftId)}">Submission queued.`,
+  );
+}
+
+function isPilotPr(payload: Record<string, unknown>, env: Env) {
+  const pull = payload.pull_request as
+    | {
+        number?: number;
+        draft?: boolean;
+        base?: { ref?: string; repo?: { full_name?: string } };
+        head?: { ref?: string };
+        labels?: Array<{ name?: string }>;
+      }
+    | undefined;
+  if (!pull || pull.draft) return false;
+  if (isMaintainerImportRef(pull.head?.ref)) return false;
+  const labels = pull.labels?.map((label) => label.name) || [];
+  return pull.base?.ref === env.PILOT_BASE_REF || labels.includes(PILOT_LABEL);
+}
+
+function parseCsv(value: string | undefined, fallback: string[] = []) {
+  const parsed = (value || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return parsed.length ? parsed : fallback;
+}
+
+function requiredValidationChecks(env: Env) {
+  return parseCsv(
+    env.REQUIRED_VALIDATION_CHECKS,
+    DEFAULT_REQUIRED_VALIDATION_CHECKS,
+  );
+}
+
+function requiredStatusContexts(env: Env) {
+  return parseCsv(env.REQUIRED_STATUS_CONTEXTS);
+}
+
+function installationIdFromPayload(payload: Record<string, unknown>) {
+  return Number((payload.installation as { id?: number } | undefined)?.id || 0);
+}
+
+function reviewTargetFromPullPayload(
+  payload: Record<string, unknown>,
+): ReviewTarget | null {
+  const pull = payload.pull_request as
+    | {
+        number?: number;
+        base?: { ref?: string; repo?: { full_name?: string } };
+        head?: {
+          sha?: string;
+          ref?: string;
+          repo?: { full_name?: string };
+        };
+      }
+    | undefined;
+  if (!pull?.number || !pull.base?.repo?.full_name) return null;
+  return {
+    repoFullName: pull.base.repo.full_name,
+    number: pull.number,
+    baseRef: pull.base.ref || "",
+    headRepo: pull.head?.repo?.full_name,
+    headRef: pull.head?.ref,
+    headSha: pull.head?.sha,
+    installationId: installationIdFromPayload(payload),
+  };
+}
+
+function reviewTargetFromPullRecord(
+  pull: {
+    number?: number;
+    base?: { ref?: string; repo?: { full_name?: string } };
+    head?: {
+      sha?: string;
+      ref?: string;
+      repo?: { full_name?: string };
+    };
+  },
+  installationId?: number,
+): ReviewTarget | null {
+  if (!pull?.number || !pull.base?.repo?.full_name) return null;
+  return {
+    repoFullName: pull.base.repo.full_name,
+    number: pull.number,
+    baseRef: pull.base.ref || "",
+    headRepo: pull.head?.repo?.full_name,
+    headRef: pull.head?.ref,
+    headSha: pull.head?.sha,
+    installationId,
+  };
+}
+
+function reviewTargetFromMessage(message: QueueMessage): ReviewTarget | null {
+  if (isRecord(message.payload.target)) {
+    const target = message.payload.target as Record<string, unknown>;
+    const repoFullName = String(target.repoFullName || "");
+    const number = Number(target.number || 0);
+    if (!repoFullName || !number) return null;
+    return {
+      repoFullName,
+      number,
+      baseRef: String(target.baseRef || ""),
+      headRepo:
+        typeof target.headRepo === "string" ? target.headRepo : undefined,
+      headRef: typeof target.headRef === "string" ? target.headRef : undefined,
+      headSha: typeof target.headSha === "string" ? target.headSha : undefined,
+      installationId: Number(target.installationId || 0) || undefined,
+    };
+  }
+  const webhook = message.payload.webhook as
+    | Record<string, unknown>
+    | undefined;
+  return webhook ? reviewTargetFromPullPayload(webhook) : null;
+}
+
+async function installationTokenForInstallationId(
+  env: Env,
+  installationId: number,
+) {
+  if (!installationId || !env.GITHUB_APP_ID || !env.GITHUB_APP_PRIVATE_KEY)
+    return "";
+  return getInstallationToken({
+    appId: env.GITHUB_APP_ID,
+    privateKeyPem: env.GITHUB_APP_PRIVATE_KEY,
+    installationId,
+    apiVersion: env.GITHUB_API_VERSION,
+  });
+}
+
+async function installationTokenForPayload(
+  env: Env,
+  payload: Record<string, unknown>,
+) {
+  return installationTokenForInstallationId(
+    env,
+    installationIdFromPayload(payload),
+  );
+}
+
+async function applyUnderReview(env: Env, payload: Record<string, unknown>) {
+  const pull = payload.pull_request as
+    | {
+        number?: number;
+        base?: { repo?: { full_name?: string } };
+      }
+    | undefined;
+  if (!pull?.number || !pull.base?.repo?.full_name) return;
+  const token = await installationTokenForPayload(env, payload);
+  if (!token) return;
+  const repo = parseRepo(pull.base.repo.full_name);
+  await addLabels({
+    token,
+    repo,
+    issueNumber: pull.number,
+    labels: [LABELS.underReview],
+    apiVersion: env.GITHUB_API_VERSION,
+  });
+  await upsertMarkerComment({
+    token,
+    repo,
+    issueNumber: pull.number,
+    marker: env.REVIEW_MARKER || DEFAULT_REVIEW_MARKER,
+    body: markerComment(undefined, env.REVIEW_MARKER || DEFAULT_REVIEW_MARKER),
+    apiVersion: env.GITHUB_API_VERSION,
+  });
+}
+
+async function applyUnderReviewToTarget(env: Env, target: ReviewTarget) {
+  const token = await installationTokenForInstallationId(
+    env,
+    Number(target.installationId || 0),
+  );
+  if (!token) return;
+  const repo = parseRepo(target.repoFullName);
+  await addLabels({
+    token,
+    repo,
+    issueNumber: target.number,
+    labels: [LABELS.underReview],
+    apiVersion: env.GITHUB_API_VERSION,
+  });
+  await upsertMarkerComment({
+    token,
+    repo,
+    issueNumber: target.number,
+    marker: env.REVIEW_MARKER || DEFAULT_REVIEW_MARKER,
+    body: markerComment(undefined, env.REVIEW_MARKER || DEFAULT_REVIEW_MARKER),
+    apiVersion: env.GITHUB_API_VERSION,
+  });
+}
+
+function isRecheckCommand(body: unknown) {
+  return (
+    String(body || "")
+      .trim()
+      .split(/\s+/)[0] === "/recheck"
+  );
+}
+
+function hasPilotLabel(issue: { labels?: Array<{ name?: string }> }) {
+  return Boolean(
+    issue.labels?.some((label) => String(label.name || "") === PILOT_LABEL),
+  );
+}
+
+async function targetFromIssueCommentRecheck(
+  env: Env,
+  payload: Record<string, unknown>,
+) {
+  if (String(payload.action || "") !== "created") return null;
+  const comment = payload.comment as
+    | { body?: string; author_association?: string }
+    | undefined;
+  const issue = payload.issue as
+    | {
+        number?: number;
+        pull_request?: Record<string, unknown>;
+        labels?: Array<{ name?: string }>;
+      }
+    | undefined;
+  const repository = payload.repository as { full_name?: string } | undefined;
+  const installationId = installationIdFromPayload(payload);
+  if (!isRecheckCommand(comment?.body)) return null;
+  if (
+    !TRUSTED_RECHECK_ASSOCIATIONS.has(String(comment?.author_association || ""))
+  ) {
+    return null;
+  }
+  if (!issue?.number || !issue.pull_request || !repository?.full_name) {
+    return null;
+  }
+  const token = await installationTokenForInstallationId(env, installationId);
+  if (!token) return null;
+  const repo = parseRepo(repository.full_name);
+  const pull = await getPullRequest({
+    token,
+    repo,
+    number: issue.number,
+    apiVersion: env.GITHUB_API_VERSION,
+  });
+  if (pull.draft) return null;
+  const target = reviewTargetFromPullRecord(pull, installationId);
+  if (!target) return null;
+  if (isMaintainerImportRef(target.headRef)) return null;
+  if (target.baseRef !== env.PILOT_BASE_REF && !hasPilotLabel(issue)) {
+    return null;
+  }
+  return target;
+}
+
+function targetKeyForReview(target: ReviewTarget) {
+  return `${target.repoFullName}#${target.number}`;
+}
+
+function hasTerminalGateDecision(
+  state:
+    | {
+        status?: unknown;
+        verdict?: unknown;
+        importPrUrl?: unknown;
+      }
+    | null
+    | undefined,
+) {
+  if (!state) return false;
+  if (String(state.status || "") === "merged") return true;
+  if (String(state.status || "") === "import_pr_open") return true;
+  if (String(state.verdict || "") === "import") {
+    return (
+      typeof state.importPrUrl === "string" && state.importPrUrl.length > 0
+    );
+  }
+  return TERMINAL_GATE_VERDICTS.has(String(state.verdict || ""));
+}
+
+function isRetryableMergeError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || "");
+  return /required status check|required approving review|not mergeable|merge conflict|base branch was modified|head branch was modified|sha does not match|review_required|status check/i.test(
+    message,
+  );
+}
+
+function importContentPathParts(filePath: string) {
+  const match = /^content\/([^/]+)\/([^/]+)\.mdx$/i.exec(filePath);
+  if (!match) return null;
+  return {
+    category: match[1].toLowerCase(),
+    slug: slugify(match[2]),
+  };
+}
+
+async function directContentScopeForPr(params: {
+  token: string;
+  repo: ReturnType<typeof parseRepo>;
+  number: number;
+  apiVersion?: string;
+}): Promise<DirectContentScope> {
+  const files = await listPullRequestFiles({
+    token: params.token,
+    repo: params.repo,
+    number: params.number,
+    apiVersion: params.apiVersion,
+  });
+  if (files.length !== 1) {
+    throw new Error(
+      "Direct content submissions must change exactly one source content file.",
+    );
+  }
+
+  const file = files[0];
+  const filePath = String(file.filename || "");
+  const pathParts = importContentPathParts(filePath);
+  if (!pathParts || !pathParts.slug) {
+    throw new Error(
+      "Direct content submissions must change one content/<category>/<slug>.mdx file.",
+    );
+  }
+  const status = String(file.status || "");
+  if (status === "removed") {
+    throw new Error("Direct content submissions cannot remove content files.");
+  }
+
+  return {
+    filePath,
+    category: pathParts.category,
+    slug: pathParts.slug,
+    status,
+  };
+}
+
+function scopeFailureDecision(error: unknown): GateDecision {
+  const message =
+    error instanceof Error
+      ? error.message
+      : "Direct content scope validation failed.";
+  return {
+    verdict: "close" as const,
+    summary: [
+      "Summary:",
+      `- ${message}`,
+      "",
+      "Required Shape:",
+      "- Submit exactly one raw `content/<category>/<slug>.mdx` file.",
+      "- Do not edit generated artifacts, README, registry data, workflows, scripts, packages, or multiple entries.",
+      "",
+      "Recommended Action:",
+      "- Close this PR and resubmit a focused single-entry content PR.",
+    ].join("\n"),
+    labels: [LABELS.close],
+    close: true,
+  };
+}
+
+function normalizeGateDecision(decision: GateDecision): GateDecision {
+  if (decision.verdict !== "import") return decision;
+  return {
+    ...decision,
+    verdict: "merge",
+    labels: decision.labels.filter(
+      (label) => label !== LABELS.importOpen && label !== LABELS.superseded,
+    ),
+    importJob: undefined,
+  };
+}
+
+function validationGateDecision(validation: {
+  summary: string;
+  checks: Array<{ name: string; status: string; details?: string }>;
+}): GateDecision {
+  const superagentFailures = validation.checks.filter(
+    (check) =>
+      check.status === "failed" &&
+      /superagent/i.test(`${check.name} ${check.details || ""}`),
+  );
+  if (superagentFailures.length) {
+    const inconclusive = superagentFailures.some((check) =>
+      /action_required|neutral|skipped|cancelled/i.test(check.details || ""),
+    );
+    if (inconclusive) {
+      return defaultManualDecision(
+        `${validation.summary} Superagent did not return a clear pass/fail result.`,
+      );
+    }
+    return {
+      verdict: "close" as const,
+      summary: [
+        "Summary:",
+        `- ${validation.summary}`,
+        "",
+        "Security Review:",
+        "- Superagent did not pass, so this content PR is not eligible for automated merge.",
+        "",
+        "Recommended Action:",
+        "- Close this PR and resubmit only after the flagged issue is resolved.",
+      ].join("\n"),
+      labels: [LABELS.close],
+      close: true,
+    };
+  }
+  return validationFailedDecision(validation.summary);
+}
+
+async function mergeAcceptedPullRequest(params: {
+  env: Env;
+  token: string;
+  repo: ReturnType<typeof parseRepo>;
+  target: ReviewTarget;
+  decision: GateDecision;
+  scope: DirectContentScope;
+}) {
+  const expectedHeadSha = params.target.headSha || "";
+  if (!expectedHeadSha) {
+    throw new Error("Direct merge requires the current PR head SHA.");
+  }
+  const reviewBody = [
+    "Automated review by HeyClaude Maintainer Agent.",
+    "",
+    "This content-only PR passed content validation, Superagent, duplicate/history review, source/provenance review, category-fit review, and safety/privacy review.",
+    "",
+    "The agent is approving and merging this PR directly. Generated artifacts are produced during build/deploy and are not committed by contributors.",
+  ].join("\n");
+  await approvePullRequest({
+    token: params.token,
+    repo: params.repo,
+    number: params.target.number,
+    body: reviewBody,
+    apiVersion: params.env.GITHUB_API_VERSION,
+  });
+  const result = await mergePullRequest({
+    token: params.token,
+    repo: params.repo,
+    number: params.target.number,
+    expectedHeadSha,
+    commitTitle: `feat(content): add ${params.scope.category} ${params.scope.slug}`,
+    commitMessage: [
+      `Accepted by HeyClaude Maintainer Agent from PR #${params.target.number}.`,
+      "",
+      params.decision.summary.trim(),
+    ].join("\n"),
+    apiVersion: params.env.GITHUB_API_VERSION,
+  });
+  if (result.merged === false) {
+    throw new Error(result.message || "GitHub did not merge the pull request.");
+  }
+  return result;
+}
+
+async function fetchRawPullRequestFileContent(rawUrl: unknown) {
+  const url = new URL(String(rawUrl || ""));
+  if (
+    url.protocol !== "https:" ||
+    !["github.com", "raw.githubusercontent.com"].includes(url.hostname)
+  ) {
+    throw new Error("Import synthesis raw file URL is not a GitHub HTTPS URL.");
+  }
+  const response = await fetch(url.toString(), {
+    headers: { "user-agent": "heyclaude-submission-gate" },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!response.ok) {
+    throw new Error(`GitHub raw file fetch returned ${response.status}.`);
+  }
+  const content = await response.text();
+  if (content.length > 100_000) {
+    throw new Error("Import synthesis raw file is too large.");
+  }
+  return content;
+}
+
+async function synthesizeImportJobFromSourcePr(params: {
+  env: Env;
+  token: string;
+  repo: ReturnType<typeof parseRepo>;
+  target: ReviewTarget;
+}) {
+  const files = await listPullRequestFiles({
+    token: params.token,
+    repo: params.repo,
+    number: params.target.number,
+    apiVersion: params.env.GITHUB_API_VERSION,
+  });
+  if (files.length !== 1) {
+    throw new Error("Import synthesis requires exactly one changed PR file.");
+  }
+
+  const file = files[0];
+  const filePath = String(file.filename || "");
+  const pathParts = importContentPathParts(filePath);
+  if (!pathParts || !pathParts.slug) {
+    throw new Error(
+      "Import synthesis requires one content/<category>/<slug>.mdx file.",
+    );
+  }
+  if (String(file.status || "") === "removed") {
+    throw new Error("Import synthesis cannot import removed content files.");
+  }
+
+  const headRepo = parseRepo(
+    params.target.headRepo || params.target.repoFullName,
+  );
+  const headRef = params.target.headSha || params.target.headRef || "";
+  if (!headRef) {
+    throw new Error("Import synthesis requires a PR head ref or SHA.");
+  }
+
+  let content: string;
+  try {
+    content = await getRepositoryFileContent({
+      token: params.token,
+      repo: headRepo,
+      path: filePath,
+      ref: headRef,
+      apiVersion: params.env.GITHUB_API_VERSION,
+    });
+  } catch {
+    content = await fetchRawPullRequestFileContent(file.raw_url);
+  }
+
+  return {
+    branchName: `automation/submission-pr-${params.target.number}-${pathParts.slug}`,
+    title: `feat(content): import ${pathParts.category} ${pathParts.slug}`,
+    body: [
+      `Maintainer-owned import generated from source PR #${params.target.number}.`,
+      "",
+      "The private submission gate accepted the source PR after public validation and private review.",
+      "Generated artifacts are produced during validation/build and are not committed in this import PR.",
+    ].join("\n"),
+    files: [
+      {
+        path: filePath,
+        content,
+      },
+    ],
+  };
+}
+
+async function enqueueReviewTarget(
+  env: Env,
+  target: ReviewTarget,
+  deliveryId: string,
+  eventName: string,
+  webhook?: Record<string, unknown>,
+  pilotScoped = false,
+  forceRecheck = false,
+) {
+  if (isMaintainerImportRef(target.headRef)) return false;
+  if (!pilotScoped && target.baseRef !== env.PILOT_BASE_REF) return false;
+  const targetKey = targetKeyForReview(target);
+  const existing = await getPrState(env.SUBMISSION_GATE_DB, {
+    repo: target.repoFullName,
+    number: target.number,
+  });
+  if (!forceRecheck && hasTerminalGateDecision(existing)) return false;
+  await upsertPrState(env.SUBMISSION_GATE_DB, {
+    repo: target.repoFullName,
+    number: target.number,
+    headRepo: target.headRepo,
+    headRef: target.headRef,
+    baseRef: target.baseRef || env.PILOT_BASE_REF,
+    status: "queued",
+    deliveryId,
+  });
+  await env.SUBMISSION_REVIEW_QUEUE.send({
+    kind: "review_pr",
+    targetKey,
+    payload: { eventName, deliveryId, target, webhook, forceRecheck },
+  });
+  return true;
+}
+
+function targetsFromWebhookPullRefs(
+  payload: Record<string, unknown>,
+  refs: Array<Record<string, unknown>>,
+  headSha: string,
+) {
+  const repository = payload.repository as { full_name?: string } | undefined;
+  const fallbackRepoFullName = repository?.full_name || "";
+  const installationId = installationIdFromPayload(payload);
+  return refs
+    .map((item): ReviewTarget | null => {
+      const number = Number(item.number || 0);
+      const base = item.base as
+        | { ref?: string; repo?: { full_name?: string } }
+        | undefined;
+      const head = item.head as
+        | { ref?: string; sha?: string; repo?: { full_name?: string } }
+        | undefined;
+      const repoFullName = base?.repo?.full_name || fallbackRepoFullName;
+      if (!number || !repoFullName) return null;
+      return {
+        repoFullName,
+        number,
+        baseRef: base?.ref || "",
+        headRepo: head?.repo?.full_name,
+        headRef: head?.ref,
+        headSha: head?.sha || headSha,
+        installationId,
+      };
+    })
+    .filter((target): target is ReviewTarget => Boolean(target));
+}
+
+async function targetsFromValidationWebhook(
+  env: Env,
+  eventName: string,
+  payload: Record<string, unknown>,
+) {
+  if (eventName === "check_run") {
+    const action = String(payload.action || "");
+    if (!REVIEWABLE_CHECK_ACTIONS.has(action)) return [];
+    const checkRun = payload.check_run as
+      | { head_sha?: string; pull_requests?: Array<Record<string, unknown>> }
+      | undefined;
+    return targetsFromWebhookPullRefs(
+      payload,
+      checkRun?.pull_requests || [],
+      checkRun?.head_sha || "",
+    );
+  }
+
+  if (eventName === "check_suite") {
+    const action = String(payload.action || "");
+    if (!REVIEWABLE_CHECK_ACTIONS.has(action)) return [];
+    const checkSuite = payload.check_suite as
+      | { head_sha?: string; pull_requests?: Array<Record<string, unknown>> }
+      | undefined;
+    return targetsFromWebhookPullRefs(
+      payload,
+      checkSuite?.pull_requests || [],
+      checkSuite?.head_sha || "",
+    );
+  }
+
+  if (eventName === "status") {
+    const repository = payload.repository as { full_name?: string } | undefined;
+    const repoFullName = repository?.full_name || "";
+    const sha = String(payload.sha || "");
+    const installationId = installationIdFromPayload(payload);
+    if (!repoFullName || !sha || !installationId) return [];
+    const token = await installationTokenForInstallationId(env, installationId);
+    if (!token) return [];
+    const repo = parseRepo(repoFullName);
+    const pulls = await listPullRequestsForCommit({
+      token,
+      repo,
+      sha,
+      apiVersion: env.GITHUB_API_VERSION,
+    });
+    return pulls
+      .map((pull): ReviewTarget | null => {
+        if (!pull.number || !pull.base?.repo?.full_name) return null;
+        return {
+          repoFullName: pull.base.repo.full_name,
+          number: pull.number,
+          baseRef: pull.base.ref || "",
+          headRepo: pull.head?.repo?.full_name,
+          headRef: pull.head?.ref,
+          headSha: pull.head?.sha || sha,
+          installationId,
+        };
+      })
+      .filter((target): target is ReviewTarget => Boolean(target));
+  }
+
+  return [];
+}
+
+async function githubWebhookRoute(
+  request: Request,
+  env: Env,
+  ctx: ExecutionContext,
+) {
+  const raw = await request.text();
+  const signature = request.headers.get("x-hub-signature-256");
+  const deliveryId =
+    request.headers.get("x-github-delivery") || crypto.randomUUID();
+  if (!env.GITHUB_WEBHOOK_SECRET) {
+    return json(
+      { ok: false, error: "webhook_secret_not_configured" },
+      { status: 503 },
+    );
+  }
+  const valid = await verifyGitHubWebhookSignature({
+    secret: env.GITHUB_WEBHOOK_SECRET,
+    payload: raw,
+    signatureHeader: signature,
+  });
+  if (!valid)
+    return json({ ok: false, error: "invalid_signature" }, { status: 401 });
+
+  let payload: Record<string, unknown>;
+  try {
+    payload = JSON.parse(raw) as Record<string, unknown>;
+  } catch (error) {
+    console.warn("invalid GitHub webhook payload", { deliveryId, error });
+    return json({ ok: false, error: "invalid_payload" }, { status: 400 });
+  }
+  const eventName = request.headers.get("x-github-event") || "";
+  await putAuditObject(
+    env,
+    `webhooks/${eventName}/${deliveryId}.json`,
+    payload,
+  );
+
+  if (eventName === "pull_request") {
+    const action = String(payload.action || "");
+    const target = reviewTargetFromPullPayload(payload);
+    if (!REVIEWABLE_PR_ACTIONS.has(action) || !target) {
+      return json({ ok: true, ignored: true });
+    }
+    if (!isPilotPr(payload, env))
+      return json({ ok: true, ignored: true, reason: "outside_pilot" });
+    ctx.waitUntil(applyUnderReview(env, payload));
+    await enqueueReviewTarget(
+      env,
+      target,
+      deliveryId,
+      eventName,
+      payload,
+      true,
+      true,
+    );
+    const targetKey = targetKeyForReview(target);
+    return json({ ok: true, queued: true, targetKey });
+  }
+
+  if (eventName === "issue_comment") {
+    const target = await targetFromIssueCommentRecheck(env, payload);
+    if (!target) return json({ ok: true, ignored: true });
+    await applyUnderReviewToTarget(env, target);
+    await enqueueReviewTarget(
+      env,
+      target,
+      deliveryId,
+      eventName,
+      payload,
+      true,
+      true,
+    );
+    const targetKey = targetKeyForReview(target);
+    return json({ ok: true, queued: true, targetKey });
+  }
+
+  if (VALIDATION_WEBHOOK_EVENTS.has(eventName)) {
+    const targets = await targetsFromValidationWebhook(env, eventName, payload);
+    let queued = 0;
+    for (const target of targets) {
+      if (
+        await enqueueReviewTarget(env, target, deliveryId, eventName, payload)
+      ) {
+        queued += 1;
+      }
+    }
+    return json({ ok: true, queued, ignored: queued === 0 });
+  }
+
+  return json({ ok: true, ignored: true });
+}
+
+async function reviewWithPrivateGate(env: Env, message: QueueMessage) {
+  if (!env.PRIVATE_GATE_REVIEW_URL || !env.INTERNAL_SHARED_SECRET) {
+    return defaultManualDecision();
+  }
+  const body = JSON.stringify(message);
+  const signature = await signInternalPayload(env.INTERNAL_SHARED_SECRET, body);
+  let response: Response;
+  try {
+    response = await fetch(env.PRIVATE_GATE_REVIEW_URL, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-heyclaude-internal-signature": signature,
+      },
+      body,
+      signal: AbortSignal.timeout(90_000),
+    });
+  } catch {
+    return defaultManualDecision("Private corpus review request failed.");
+  }
+  if (!response.ok) {
+    return defaultManualDecision(
+      `Private corpus review returned ${response.status}.`,
+    );
+  }
+  const raw = (await response
+    .json()
+    .catch(() => null)) as Partial<GateDecision> | null;
+  if (!raw || !GATE_VERDICTS.has(raw.verdict as GateVerdict)) {
+    return defaultManualDecision(
+      "Private corpus review returned an unexpected payload.",
+    );
+  }
+  return normalizeGateDecision({
+    verdict: raw.verdict as GateVerdict,
+    summary: typeof raw.summary === "string" ? raw.summary : "",
+    labels: Array.isArray(raw.labels)
+      ? raw.labels.filter((label): label is string => typeof label === "string")
+      : [],
+    close: raw.close === true,
+    importJob: isRecord(raw.importJob) ? raw.importJob : undefined,
+  });
+}
+
+async function withSubmissionLock(
+  env: Env,
+  targetKey: string,
+  fn: () => Promise<void>,
+) {
+  const stub = env.SUBMISSION_LOCK.getByName(targetKey);
+  const response = await stub.fetch("https://lock.local/acquire", {
+    method: "POST",
+    body: JSON.stringify({ ttlSeconds: 120 }),
+  });
+  if (response.status === 423) throw new SubmissionLockBusyError(targetKey);
+  if (!response.ok) {
+    throw new Error(`Submission lock acquire failed: ${response.status}`);
+  }
+  const lock = (await response.json().catch(() => ({}))) as {
+    fenceToken?: string;
+  };
+  if (!lock.fenceToken) {
+    throw new Error("Submission lock acquire did not return a fence token.");
+  }
+  try {
+    await fn();
+  } finally {
+    try {
+      await stub.fetch("https://lock.local/release", {
+        method: "POST",
+        body: JSON.stringify({ fenceToken: lock.fenceToken }),
+      });
+    } catch (error) {
+      console.error("submission lock release failed", {
+        targetKey,
+        fenceToken: lock.fenceToken,
+        error,
+      });
+    }
+  }
+}
+
+async function handleReviewMessage(env: Env, message: QueueMessage) {
+  await withSubmissionLock(env, message.targetKey, async () => {
+    if (message.kind === "submit_draft") {
+      const draftId = String(message.payload.draftId || "");
+      const draft = await getDraft(env.SUBMISSION_GATE_DB, draftId);
+      if (!draft) {
+        console.debug("submit_draft skipped", {
+          draftId,
+          hasDraft: false,
+        });
+        return;
+      }
+      if (draft.status === "pr_open" && draft.pullRequestUrl) return;
+      const encryptedToken = await getDraftUserToken(
+        env.SUBMISSION_GATE_DB,
+        draftId,
+      );
+      const userToken =
+        encryptedToken && env.INTERNAL_SHARED_SECRET
+          ? await decryptText(env.INTERNAL_SHARED_SECRET, encryptedToken)
+          : "";
+      if (!userToken) {
+        console.debug("submit_draft skipped", {
+          draftId,
+          hasDraft: true,
+          hasToken: false,
+        });
+        return;
+      }
+      const fields = parseStoredDraftFields(draftId, draft.fieldsJson, {
+        category: draft.category,
+        slug: draft.slug,
+        name: draft.slug,
+      });
+      const title = `Add ${String(draft.category)}: ${String(fields.name || fields.title || draft.slug)}`;
+      const content = buildContributorMdx(fields);
+      const pr = await createUserForkContentPr({
+        userToken,
+        publicRepo: env.PUBLIC_REPO,
+        baseRef: String(draft.baseRef || env.PILOT_BASE_REF),
+        branchName: String(draft.branchName),
+        targetPath: String(draft.targetPath),
+        content,
+        title,
+        body: [
+          "PR-first submission created by the HeyClaude website.",
+          "",
+          "The private submission gate will review category fit, source of truth, duplicate history, safety/privacy, provenance, and generated-artifact scope.",
+        ].join("\n"),
+        apiVersion: env.GITHUB_API_VERSION,
+      });
+      await updateDraftStatus(env.SUBMISSION_GATE_DB, draftId, "pr_open", pr);
+      await consumeDraftUserToken(env.SUBMISSION_GATE_DB, draftId);
+      await insertAudit(env.SUBMISSION_GATE_DB, {
+        id: crypto.randomUUID(),
+        targetKey: message.targetKey,
+        eventType: "submit_draft",
+        decision: "pr_open",
+        summary: pr.pullRequestUrl,
+      });
+      return;
+    }
+
+    if (message.kind === "review_pr") {
+      const target = reviewTargetFromMessage(message);
+      if (!target) return;
+      const forceRecheck =
+        message.payload.forceRecheck === true ||
+        String(message.payload.eventName || "") === "issue_comment";
+      const existing = await getPrState(env.SUBMISSION_GATE_DB, {
+        repo: target.repoFullName,
+        number: target.number,
+      });
+      if (!forceRecheck && hasTerminalGateDecision(existing)) {
+        await insertAudit(env.SUBMISSION_GATE_DB, {
+          id: crypto.randomUUID(),
+          targetKey: message.targetKey,
+          eventType: message.kind,
+          decision: "ignored",
+          summary:
+            "Skipped because this submission already has a terminal gate decision.",
+        });
+        return;
+      }
+      const token = await installationTokenForInstallationId(
+        env,
+        Number(target.installationId || 0),
+      );
+      if (!token) return;
+      const repo = parseRepo(target.repoFullName);
+      let decision: GateDecision | null = null;
+      let validationForPrivateReview: unknown = null;
+      let contentScopeForPrivateReview: DirectContentScope | null = null;
+      try {
+        const validation = await getCommitValidationState({
+          token,
+          repo,
+          ref: target.headSha || target.headRef || "",
+          requiredChecks: requiredValidationChecks(env),
+          requiredStatusContexts: requiredStatusContexts(env),
+          apiVersion: env.GITHUB_API_VERSION,
+        });
+        if (validation.state === "pending") {
+          await upsertPrState(env.SUBMISSION_GATE_DB, {
+            repo: target.repoFullName,
+            number: target.number,
+            headRepo: target.headRepo,
+            headRef: target.headRef,
+            baseRef: target.baseRef || env.PILOT_BASE_REF,
+            status: "validation_pending",
+            deliveryId: String(message.payload.deliveryId || ""),
+          });
+          await insertAudit(env.SUBMISSION_GATE_DB, {
+            id: crypto.randomUUID(),
+            targetKey: message.targetKey,
+            eventType: message.kind,
+            decision: "validation_pending",
+            summary: validation.summary,
+          });
+          return;
+        }
+        if (validation.state === "failed") {
+          decision = validationGateDecision(validation);
+        } else {
+          validationForPrivateReview = {
+            state: validation.state,
+            summary: validation.summary,
+            checks: validation.checks,
+          };
+          try {
+            contentScopeForPrivateReview = await directContentScopeForPr({
+              token,
+              repo,
+              number: target.number,
+              apiVersion: env.GITHUB_API_VERSION,
+            });
+          } catch (error) {
+            decision = scopeFailureDecision(error);
+          }
+        }
+      } catch {
+        decision = defaultManualDecision(
+          "Submission gate could not read public validation checks.",
+        );
+      }
+
+      if (!decision) {
+        decision = await reviewWithPrivateGate(env, {
+          ...message,
+          payload: {
+            ...message.payload,
+            validation: validationForPrivateReview,
+            contentScope: contentScopeForPrivateReview,
+            privateReviewRequirements: {
+              finalAction: "merge_or_close",
+              duplicateHistoryRequired: true,
+              duplicateSignals: [
+                "slug",
+                "title",
+                "source_url",
+                "github_url",
+                "docs_url",
+                "package_url",
+                "domain",
+                "aliases",
+                "normalized_description",
+                "accepted_history",
+                "rejected_history",
+              ],
+            },
+          },
+        });
+      }
+      decision = normalizeGateDecision(decision);
+      if (decision.verdict === "merge" && !contentScopeForPrivateReview) {
+        try {
+          contentScopeForPrivateReview = await directContentScopeForPr({
+            token,
+            repo,
+            number: target.number,
+            apiVersion: env.GITHUB_API_VERSION,
+          });
+        } catch (error) {
+          decision = scopeFailureDecision(error);
+        }
+      }
+      const status =
+        decision.verdict === "merge" ? "merge_accepted" : decision.verdict;
+      const labelsToApply =
+        decision.verdict === "merge"
+          ? decision.labels.filter(
+              (label) =>
+                label !== LABELS.merged &&
+                label !== LABELS.importOpen &&
+                label !== LABELS.superseded,
+            )
+          : decision.labels;
+
+      await insertAudit(env.SUBMISSION_GATE_DB, {
+        id: crypto.randomUUID(),
+        targetKey: message.targetKey,
+        eventType: message.kind,
+        decision: decision.verdict,
+        summary: decision.summary,
+      });
+      await upsertPrState(env.SUBMISSION_GATE_DB, {
+        repo: target.repoFullName,
+        number: target.number,
+        headRepo: target.headRepo,
+        headRef: target.headRef,
+        baseRef: target.baseRef || env.PILOT_BASE_REF,
+        status,
+        verdict: decision.verdict,
+        verdictSummary: decision.summary,
+      });
+      await removeLabels({
+        token,
+        repo,
+        issueNumber: target.number,
+        labels: DECISION_LABELS.filter(
+          (label) => !labelsToApply.includes(label),
+        ),
+        apiVersion: env.GITHUB_API_VERSION,
+      });
+      if (labelsToApply.length) {
+        await addLabels({
+          token,
+          repo,
+          issueNumber: target.number,
+          labels: labelsToApply,
+          apiVersion: env.GITHUB_API_VERSION,
+        });
+      }
+      await upsertMarkerComment({
+        token,
+        repo,
+        issueNumber: target.number,
+        marker: env.REVIEW_MARKER || DEFAULT_REVIEW_MARKER,
+        body: markerComment(
+          decision,
+          env.REVIEW_MARKER || DEFAULT_REVIEW_MARKER,
+        ),
+        apiVersion: env.GITHUB_API_VERSION,
+      });
+      if (
+        (decision.verdict === "close" ||
+          decision.verdict === "request_changes") &&
+        decision.close
+      ) {
+        await closeIssueOrPullRequest({
+          token,
+          repo,
+          issueNumber: target.number,
+          apiVersion: env.GITHUB_API_VERSION,
+        });
+      }
+      if (decision.verdict === "merge" && contentScopeForPrivateReview) {
+        try {
+          const mergeResult = await mergeAcceptedPullRequest({
+            env,
+            token,
+            repo,
+            target,
+            decision,
+            scope: contentScopeForPrivateReview,
+          });
+          const mergedSummary = [
+            decision.summary.trim(),
+            "",
+            "Merge Result:",
+            `- Merged this PR directly at \`${mergeResult.sha || target.headSha || "unknown"}\`.`,
+          ].join("\n");
+          const mergedDecision: GateDecision = {
+            ...decision,
+            summary: mergedSummary,
+            labels: [LABELS.merged],
+          };
+          await upsertPrState(env.SUBMISSION_GATE_DB, {
+            repo: target.repoFullName,
+            number: target.number,
+            headRepo: target.headRepo,
+            headRef: target.headRef,
+            baseRef: target.baseRef || env.PILOT_BASE_REF,
+            status: "merged",
+            verdict: "merge",
+            verdictSummary: mergedSummary,
+          });
+          await removeLabels({
+            token,
+            repo,
+            issueNumber: target.number,
+            labels: DECISION_LABELS.filter((label) => label !== LABELS.merged),
+            apiVersion: env.GITHUB_API_VERSION,
+          });
+          await addLabels({
+            token,
+            repo,
+            issueNumber: target.number,
+            labels: [LABELS.merged],
+            apiVersion: env.GITHUB_API_VERSION,
+          });
+          await upsertMarkerComment({
+            token,
+            repo,
+            issueNumber: target.number,
+            marker: env.REVIEW_MARKER || DEFAULT_REVIEW_MARKER,
+            body: markerComment(
+              mergedDecision,
+              env.REVIEW_MARKER || DEFAULT_REVIEW_MARKER,
+            ),
+            apiVersion: env.GITHUB_API_VERSION,
+          });
+          await insertAudit(env.SUBMISSION_GATE_DB, {
+            id: crypto.randomUUID(),
+            targetKey: message.targetKey,
+            eventType: message.kind,
+            decision: "merged",
+            summary: mergedSummary,
+          });
+        } catch (error) {
+          if (isRetryableMergeError(error)) {
+            const pendingSummary = [
+              decision.summary.trim(),
+              "",
+              "Merge Result:",
+              `- Accepted by private review, but GitHub is not merge-ready yet: ${
+                error instanceof Error ? error.message : "unknown merge state"
+              }`,
+              "- The gate will retry after branch protection and required review state settle.",
+            ].join("\n");
+            await upsertPrState(env.SUBMISSION_GATE_DB, {
+              repo: target.repoFullName,
+              number: target.number,
+              headRepo: target.headRepo,
+              headRef: target.headRef,
+              baseRef: target.baseRef || env.PILOT_BASE_REF,
+              status: "merge_accepted",
+              verdict: "merge",
+              verdictSummary: pendingSummary,
+            });
+            await insertAudit(env.SUBMISSION_GATE_DB, {
+              id: crypto.randomUUID(),
+              targetKey: message.targetKey,
+              eventType: message.kind,
+              decision: "merge_pending",
+              summary: pendingSummary,
+            });
+            throw new SubmissionMergePendingError(pendingSummary);
+          }
+          const manualDecision = defaultManualDecision(
+            `Private review accepted this PR, but direct merge failed: ${
+              error instanceof Error ? error.message : "unknown error"
+            }.`,
+          );
+          await upsertPrState(env.SUBMISSION_GATE_DB, {
+            repo: target.repoFullName,
+            number: target.number,
+            headRepo: target.headRepo,
+            headRef: target.headRef,
+            baseRef: target.baseRef || env.PILOT_BASE_REF,
+            status: "manual",
+            verdict: "manual",
+            verdictSummary: manualDecision.summary,
+          });
+          await removeLabels({
+            token,
+            repo,
+            issueNumber: target.number,
+            labels: DECISION_LABELS.filter((label) => label !== LABELS.manual),
+            apiVersion: env.GITHUB_API_VERSION,
+          });
+          await addLabels({
+            token,
+            repo,
+            issueNumber: target.number,
+            labels: manualDecision.labels,
+            apiVersion: env.GITHUB_API_VERSION,
+          });
+          await upsertMarkerComment({
+            token,
+            repo,
+            issueNumber: target.number,
+            marker: env.REVIEW_MARKER || DEFAULT_REVIEW_MARKER,
+            body: markerComment(
+              manualDecision,
+              env.REVIEW_MARKER || DEFAULT_REVIEW_MARKER,
+            ),
+            apiVersion: env.GITHUB_API_VERSION,
+          });
+          await insertAudit(env.SUBMISSION_GATE_DB, {
+            id: crypto.randomUUID(),
+            targetKey: message.targetKey,
+            eventType: message.kind,
+            decision: "merge_failed",
+            summary: manualDecision.summary,
+          });
+        }
+      }
+    }
+  });
+}
+
+async function handleImportMessage(env: Env, message: QueueMessage) {
+  const payload = message.payload as {
+    repo?: string;
+    number?: number;
+    source?: {
+      repo?: string;
+      number?: number;
+      baseRef?: string;
+      installationId?: number;
+    };
+    runnerKey?: string;
+  };
+  const sourceInstallationId = Number(payload.source?.installationId || 0);
+  if (
+    !sourceInstallationId ||
+    !env.GITHUB_APP_ID ||
+    !env.GITHUB_APP_PRIVATE_KEY
+  ) {
+    throw new Error("Import job is missing GitHub App installation context.");
+  }
+  if (!env.INTERNAL_SHARED_SECRET) {
+    throw new Error("Import runner shared secret is not configured.");
+  }
+  const githubToken = await getInstallationToken({
+    appId: env.GITHUB_APP_ID,
+    privateKeyPem: env.GITHUB_APP_PRIVATE_KEY,
+    installationId: sourceInstallationId,
+    apiVersion: env.GITHUB_API_VERSION,
+  });
+  const callbackBaseUrl = trimTrailingSlashes(env.SUBMISSION_GATE_URL);
+  if (!callbackBaseUrl) {
+    throw new Error("Submission gate callback URL is not configured.");
+  }
+  const body = JSON.stringify({
+    ...payload,
+    targetKey: message.targetKey,
+    githubToken,
+    callbackUrl: `${callbackBaseUrl}/internal/import-complete`,
+  });
+  const signature = await signInternalPayload(env.INTERNAL_SHARED_SECRET, body);
+  const runnerKey = String(payload.runnerKey || message.targetKey);
+  const stub = env.SUBMISSION_IMPORT_RUNNER.getByName(runnerKey);
+  const response = await stub.fetch("https://container.local/import", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-heyclaude-internal-signature": signature,
+    },
+    body,
+  });
+  const result = (await response.json().catch(() => ({}))) as {
+    error?: string;
+    message?: string;
+    accepted?: boolean;
+    pullRequestUrl?: string;
+    pullRequestNumber?: number;
+  };
+  if (response.status === 202 || result.accepted) {
+    await upsertPrState(env.SUBMISSION_GATE_DB, {
+      repo: payload.source?.repo || payload.repo || "",
+      number: Number(payload.source?.number || payload.number || 0),
+      baseRef: payload.source?.baseRef || env.PILOT_BASE_REF,
+      status: "import_running",
+      verdict: "import",
+      verdictSummary:
+        result.message || "Maintainer-owned import job accepted by runner.",
+    });
+    await insertAudit(env.SUBMISSION_GATE_DB, {
+      id: crypto.randomUUID(),
+      targetKey: message.targetKey,
+      eventType: "import_pr",
+      decision: "import_queued",
+      summary:
+        result.message || "Maintainer-owned import job accepted by runner.",
+    });
+    return;
+  }
+  if (!response.ok) {
+    if (!result.pullRequestUrl) {
+      const summary = [
+        `Import runner failed: ${response.status}`,
+        result.error ? `error=${result.error}` : "",
+        result.message
+          ? `message=${String(result.message).slice(0, 1000)}`
+          : "",
+      ]
+        .filter(Boolean)
+        .join("; ");
+      await insertAudit(env.SUBMISSION_GATE_DB, {
+        id: crypto.randomUUID(),
+        targetKey: message.targetKey,
+        eventType: "import_pr",
+        decision: "import_failed",
+        summary,
+      });
+      throw new Error(summary);
+    }
+    console.warn("import runner returned existing PR with non-OK response", {
+      status: response.status,
+      pullRequestUrl: result.pullRequestUrl,
+    });
+  }
+  const sourceRepo = payload.source?.repo || payload.repo || "";
+  const sourceNumber = Number(payload.source?.number || payload.number || 0);
+  if (sourceRepo && sourceNumber && result.pullRequestUrl) {
+    await completeImportPr(env, {
+      targetKey: message.targetKey,
+      repo: sourceRepo,
+      number: sourceNumber,
+      baseRef: payload.source?.baseRef || env.PILOT_BASE_REF,
+      installationId: sourceInstallationId,
+      importPrUrl: result.pullRequestUrl,
+      githubToken,
+    });
+  }
+}
+
+async function completeImportPr(
+  env: Env,
+  params: {
+    targetKey?: string;
+    repo: string;
+    number: number;
+    baseRef?: string;
+    installationId?: number;
+    importPrUrl: string;
+    summary?: string;
+    githubToken?: string;
+  },
+) {
+  const summary =
+    params.summary ||
+    `Maintainer-owned import PR opened: ${params.importPrUrl}`;
+  await upsertPrState(env.SUBMISSION_GATE_DB, {
+    repo: params.repo,
+    number: params.number,
+    baseRef: params.baseRef || env.PILOT_BASE_REF,
+    status: "import_pr_open",
+    verdict: "import",
+    verdictSummary: summary,
+    importPrUrl: params.importPrUrl,
+  });
+
+  const token =
+    params.githubToken ||
+    (params.installationId
+      ? await getInstallationToken({
+          appId: env.GITHUB_APP_ID || "",
+          privateKeyPem: env.GITHUB_APP_PRIVATE_KEY || "",
+          installationId: params.installationId,
+          apiVersion: env.GITHUB_API_VERSION,
+        })
+      : "");
+  if (!token) return;
+
+  const repo = parseRepo(params.repo);
+  await addLabels({
+    token,
+    repo,
+    issueNumber: params.number,
+    labels: [LABELS.importOpen, LABELS.superseded],
+    apiVersion: env.GITHUB_API_VERSION,
+  });
+  await upsertMarkerComment({
+    token,
+    repo,
+    issueNumber: params.number,
+    marker: env.REVIEW_MARKER || DEFAULT_REVIEW_MARKER,
+    body: markerComment(
+      {
+        verdict: "import",
+        summary: [
+          summary,
+          "",
+          "This contributor PR is closed as superseded so generated artifacts and final validation stay maintainer-owned.",
+        ].join("\n"),
+        labels: [LABELS.importOpen, LABELS.superseded],
+      },
+      env.REVIEW_MARKER || DEFAULT_REVIEW_MARKER,
+    ),
+    apiVersion: env.GITHUB_API_VERSION,
+  });
+  await closeIssueOrPullRequest({
+    token,
+    repo,
+    issueNumber: params.number,
+    apiVersion: env.GITHUB_API_VERSION,
+  });
+}
+
+async function importCompleteRoute(request: Request, env: Env) {
+  const body = await request.text();
+  if (!env.INTERNAL_SHARED_SECRET) {
+    return json({ ok: false, error: "not_configured" }, { status: 503 });
+  }
+  const valid = await verifyInternalSignature({
+    secret: env.INTERNAL_SHARED_SECRET,
+    payload: body,
+    signatureHeader: request.headers.get("x-heyclaude-internal-signature"),
+  });
+  if (!valid)
+    return json({ ok: false, error: "invalid_signature" }, { status: 401 });
+  type ImportCompletePayload = {
+    targetKey?: string;
+    repo?: string;
+    number?: number;
+    baseRef?: string;
+    installationId?: number;
+    importPrUrl?: string;
+    summary?: string;
+    ok?: boolean;
+    error?: string;
+    message?: string;
+  };
+  let payload: ImportCompletePayload;
+  try {
+    payload = JSON.parse(body) as ImportCompletePayload;
+  } catch {
+    return json({ ok: false, error: "invalid_payload" }, { status: 400 });
+  }
+  if (payload.ok === false || !payload.importPrUrl) {
+    const summary = [
+      "Import runner failed.",
+      payload.error ? `error=${payload.error}` : "",
+      payload.message ? `message=${payload.message}` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+    if (payload.repo && payload.number) {
+      await upsertPrState(env.SUBMISSION_GATE_DB, {
+        repo: payload.repo,
+        number: payload.number,
+        baseRef: payload.baseRef || env.PILOT_BASE_REF,
+        status: "import_failed",
+        verdict: "import",
+        verdictSummary: summary,
+      });
+    }
+    await insertAudit(env.SUBMISSION_GATE_DB, {
+      id: crypto.randomUUID(),
+      targetKey:
+        payload.targetKey ||
+        `${payload.repo || "unknown"}#${payload.number || 0}`,
+      eventType: "import_complete",
+      decision: "import_failed",
+      summary,
+    });
+    return json({ ok: true });
+  }
+
+  if (!payload.repo || !payload.number) {
+    return json({ ok: false, error: "missing_import_source" }, { status: 400 });
+  }
+  await completeImportPr(env, {
+    targetKey: payload.targetKey,
+    repo: payload.repo,
+    number: payload.number,
+    baseRef: payload.baseRef || env.PILOT_BASE_REF,
+    installationId: payload.installationId,
+    importPrUrl: payload.importPrUrl,
+    summary: payload.summary || "Maintainer-owned import PR opened.",
+  });
+  await insertAudit(env.SUBMISSION_GATE_DB, {
+    id: crypto.randomUUID(),
+    targetKey:
+      payload.targetKey ||
+      `${payload.repo || "unknown"}#${payload.number || 0}`,
+    eventType: "import_complete",
+    decision: "import",
+    summary: payload.summary || payload.importPrUrl || "Import completed.",
+  });
+  return json({ ok: true });
+}
+
+async function route(request: Request, env: Env, ctx: ExecutionContext) {
+  const url = new URL(request.url);
+  if (request.method === "OPTIONS") return json({ ok: true });
+  if (request.method === "GET" && url.pathname === "/health") {
+    return json({ ok: true, service: "heyclaude-submission-gate" });
+  }
+  if (request.method === "POST" && url.pathname === "/drafts") {
+    return createDraftRoute(request, env);
+  }
+  if (request.method === "GET" && url.pathname.startsWith("/drafts/")) {
+    const id = url.pathname.split("/").pop() || "";
+    if (!/^draft_[0-9a-f-]{36}$/i.test(id)) {
+      return json({ ok: false, error: "invalid_id" }, { status: 400 });
+    }
+    return getDraftRoute(env, id);
+  }
+  if (request.method === "GET" && url.pathname === "/auth/github/start") {
+    const draftId = url.searchParams.get("draftId") || "";
+    const state = randomToken();
+    const draft = draftId
+      ? await getDraft(env.SUBMISSION_GATE_DB, draftId)
+      : null;
+    if (!draft) return json({ ok: false, error: "not_found" }, { status: 404 });
+    await updateDraftAuthState(env.SUBMISSION_GATE_DB, draftId, state);
+    return json({
+      ok: true,
+      authUrl:
+        env.GITHUB_APP_CLIENT_ID && draftId
+          ? buildGitHubAppAuthorizeUrl({
+              clientId: env.GITHUB_APP_CLIENT_ID,
+              callbackUrl: callbackUrl(request),
+              state: `${draftId}.${state}`,
+            })
+          : "",
+    });
+  }
+  if (request.method === "GET" && url.pathname === "/auth/github/callback") {
+    return githubCallbackRoute(request, env);
+  }
+  if (request.method === "POST" && url.pathname === "/webhooks/github") {
+    return githubWebhookRoute(request, env, ctx);
+  }
+  if (
+    request.method === "POST" &&
+    url.pathname === "/internal/import-complete"
+  ) {
+    return importCompleteRoute(request, env);
+  }
+  return json({ ok: false, error: "not_found" }, { status: 404 });
+}
+
+export class SubmissionLock extends DurableObject {
+  constructor(state: DurableObjectState, env: Env) {
+    super(state, env);
+  }
+
+  async fetch(request: Request) {
+    const pathname = new URL(request.url).pathname;
+    if (pathname === "/release") {
+      const body = (await request.json().catch(() => ({}))) as {
+        fenceToken?: string;
+      };
+      const storedToken = await this.ctx.storage.get<string>("fenceToken");
+      if (!body.fenceToken || body.fenceToken !== storedToken) {
+        return json(
+          { ok: false, error: "lock_token_mismatch" },
+          { status: 409 },
+        );
+      }
+      await this.ctx.storage.delete(["expiresAt", "fenceToken"]);
+      return json({ ok: true, released: true });
+    }
+    if (pathname !== "/acquire") {
+      return json({ ok: false, error: "not_found" }, { status: 404 });
+    }
+    const body = (await request.json().catch(() => ({}))) as {
+      ttlSeconds?: number;
+    };
+    const expiresAt = Number((await this.ctx.storage.get("expiresAt")) || 0);
+    const nowMs = Date.now();
+    if (expiresAt > nowMs) {
+      return json({ ok: false, locked: true }, { status: 423 });
+    }
+    const ttlMs = Math.max(10, Math.min(600, body.ttlSeconds || 120)) * 1000;
+    const fenceToken = crypto.randomUUID();
+    await this.ctx.storage.put("expiresAt", nowMs + ttlMs);
+    await this.ctx.storage.put("fenceToken", fenceToken);
+    return json({
+      ok: true,
+      locked: false,
+      expiresAt: nowMs + ttlMs,
+      fenceToken,
+    });
+  }
+}
+
+export class SubmissionImportRunner extends Container<Env> {
+  defaultPort = 8080;
+  sleepAfter = "10m";
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env);
+    this.envVars = {
+      ALLOWED_IMPORT_REPOS:
+        env.ALLOWED_IMPORT_REPOS ||
+        env.PUBLIC_REPO ||
+        "JSONbored/awesome-claude",
+      INTERNAL_SHARED_SECRET: env.INTERNAL_SHARED_SECRET || "",
+    };
+  }
+}
+
+export default {
+  async fetch(request, env, ctx) {
+    return withCors(await route(request, env, ctx), request, env);
+  },
+  async queue(batch, env) {
+    for (const message of batch.messages) {
+      const body = message.body as QueueMessage;
+      try {
+        if (body.kind === "import_pr") {
+          await handleImportMessage(env, body);
+        } else {
+          await handleReviewMessage(env, body);
+        }
+        message.ack();
+      } catch (error) {
+        if (error instanceof SubmissionLockBusyError) {
+          console.debug("submission lock contention, retrying", {
+            targetKey: body.targetKey,
+          });
+          message.retry({ delaySeconds: 5 });
+        } else if (error instanceof SubmissionMergePendingError) {
+          console.debug("submission merge pending, retrying", {
+            targetKey: body.targetKey,
+          });
+          message.retry({ delaySeconds: 30 });
+        } else {
+          console.error("submission gate queue failure", error);
+          message.retry();
+        }
+      }
+    }
+  },
+} satisfies ExportedHandler<Env, QueueMessage>;

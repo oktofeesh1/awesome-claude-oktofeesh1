@@ -11,8 +11,6 @@ import {
 export const FEED_URL = "https://heyclau.de/data/raycast-index.json";
 export const REGISTRY_SEARCH_URL = "https://heyclau.de/api/registry/search";
 export const SUBMIT_URL = "https://heyclau.de/submit";
-export const GITHUB_NEW_ISSUE_URL =
-  "https://github.com/JSONbored/awesome-claude/issues/new";
 export const CACHE_KEY = "heyclaude-raycast-index";
 export const FEED_METADATA_CACHE_KEY = "heyclaude-raycast-feed-metadata";
 export const DETAIL_CACHE_PREFIX = "heyclaude-raycast-detail";
@@ -159,19 +157,6 @@ export const categoryLabels: Record<string, string> = {
   statuslines: "Statuslines",
 };
 
-export const issueTemplateByCategory: Record<string, string> = {
-  agents: "submit-agent.yml",
-  mcp: "submit-mcp.yml",
-  tools: "submit-entry.md",
-  skills: "submit-skill.yml",
-  rules: "submit-rule.yml",
-  commands: "submit-command.yml",
-  hooks: "submit-hook.yml",
-  guides: "submit-guide.yml",
-  collections: "submit-collection.yml",
-  statuslines: "submit-statusline.yml",
-};
-
 export function entryKey(entry: Pick<RaycastEntry, "category" | "slug">) {
   return `${entry.category}:${entry.slug}`;
 }
@@ -281,19 +266,13 @@ export function buildContributeEntryUrl(
   return url.toString();
 }
 
-export function buildSubmitIssueUrl(
-  categoryOrDraft?: string | SubmissionDraft,
-) {
+export function buildSubmitPrUrl(categoryOrDraft?: string | SubmissionDraft) {
   const draft: SubmissionDraft | undefined =
     typeof categoryOrDraft === "string"
       ? { category: categoryOrDraft }
       : categoryOrDraft;
   const category = draft?.category;
-  const template = category
-    ? (issueTemplateByCategory[category] ?? "submit-entry.md")
-    : "submit-entry.md";
-  const url = new URL(GITHUB_NEW_ISSUE_URL);
-  url.searchParams.set("template", template);
+  const url = new URL(SUBMIT_URL);
   if (category) url.searchParams.set("category", category);
   setOptionalParam(url.searchParams, "title", draft?.title);
   setOptionalParam(url.searchParams, "name", draft?.title);
@@ -313,9 +292,8 @@ export function buildSubmitIssueUrl(
 }
 
 export function buildSuggestChangeUrl(entry: RaycastEntry) {
-  const template = issueTemplateByCategory[entry.category] ?? "submit-entry.md";
-  const url = new URL(GITHUB_NEW_ISSUE_URL);
-  url.searchParams.set("template", template);
+  const url = new URL(SUBMIT_URL);
+  url.searchParams.set("intent", "update");
   url.searchParams.set(
     "title",
     `Update ${categoryLabel(entry.category)}: ${entry.title}`,

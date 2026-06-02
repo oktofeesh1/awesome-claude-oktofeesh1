@@ -1,0 +1,477 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
+
+import {
+  buildDraftTarget,
+  buildContributorMdx,
+  draftFieldsFromBody,
+} from "../apps/submission-gate/src/drafts";
+import {
+  buildGitHubAppAuthorizeUrl,
+  createGitHubAppJwt,
+  getCommitValidationState,
+} from "../apps/submission-gate/src/github";
+import {
+  decryptText,
+  encryptText,
+  hmacSha256Hex,
+  signInternalPayload,
+  verifyGitHubWebhookSignature,
+  verifyInternalSignature,
+} from "../apps/submission-gate/src/security";
+import { markerComment } from "../apps/submission-gate/src/review";
+import { repoRoot } from "./helpers/registry-fixtures";
+
+function readWorkerSource() {
+  return fs.readFileSync(
+    path.join(repoRoot, "apps/submission-gate/src/index.ts"),
+    "utf8",
+  );
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+describe("Cloudflare submission gate helpers", () => {
+  it("verifies GitHub webhook HMAC signatures", async () => {
+    const payload = JSON.stringify({ action: "opened", number: 1 });
+    const digest = await hmacSha256Hex("secret", payload);
+
+    await expect(
+      verifyGitHubWebhookSignature({
+        secret: "secret",
+        payload,
+        signatureHeader: `sha256=${digest}`,
+      }),
+    ).resolves.toBe(true);
+    await expect(
+      verifyGitHubWebhookSignature({
+        secret: "secret",
+        payload,
+        signatureHeader: "sha256=deadbeef",
+      }),
+    ).resolves.toBe(false);
+  });
+
+  it("builds GitHub App user-auth URLs with callback state", () => {
+    const url = new URL(
+      buildGitHubAppAuthorizeUrl({
+        clientId: "Iv1.example",
+        callbackUrl: "https://gate.example/auth/github/callback",
+        state: "draft_123.state",
+      }),
+    );
+
+    expect(url.origin).toBe("https://github.com");
+    expect(url.pathname).toBe("/login/oauth/authorize");
+    expect(url.searchParams.get("client_id")).toBe("Iv1.example");
+    expect(url.searchParams.get("redirect_uri")).toBe(
+      "https://gate.example/auth/github/callback",
+    );
+    expect(url.searchParams.get("state")).toBe("draft_123.state");
+  });
+
+  it("normalizes draft targets to one content file on the pilot branch", () => {
+    const target = buildDraftTarget(
+      { category: "mcp", name: "Example MCP Server" },
+      "submission-gate-pilot",
+    );
+
+    expect(target).toEqual({
+      category: "mcp",
+      slug: "example-mcp-server",
+      baseRef: "submission-gate-pilot",
+      branchName: "heyclaude/submit-mcp-example-mcp-server",
+      targetPath: "content/mcp/example-mcp-server.mdx",
+    });
+  });
+
+  it("caps generated branch names while keeping the full target slug", () => {
+    const target = buildDraftTarget(
+      { category: "skills", name: "A".repeat(240) },
+      "submission-gate-pilot",
+    );
+
+    expect(target.slug).toHaveLength(120);
+    expect(target.branchName.length).toBeLessThanOrEqual(120);
+    expect(target.branchName).toMatch(/^heyclaude\/submit-skills-/);
+    expect(target.targetPath).toBe(`content/skills/${target.slug}.mdx`);
+  });
+
+  it("accepts nested or flat draft payloads from website tooling", () => {
+    expect(
+      draftFieldsFromBody({
+        fields: { category: "mcp", name: "Nested Draft" },
+      }),
+    ).toEqual({ category: "mcp", name: "Nested Draft" });
+    expect(
+      draftFieldsFromBody({ category: "skills", name: "Flat Draft" }),
+    ).toEqual({ category: "skills", name: "Flat Draft" });
+    expect(draftFieldsFromBody(null)).toEqual({});
+  });
+
+  it("generates contributor MDX without generated-artifact paths", () => {
+    const mdx = buildContributorMdx(
+      {
+        category: "skills",
+        name: "Example Skill",
+        slug: "example-skill",
+        description: "Useful source-backed skill.",
+        docs_url: "https://example.com/docs",
+        usage_snippet: "Use this skill for focused testing.",
+        safety_notes: "Review scripts before running.",
+        privacy_notes: "Does not collect user data.",
+      },
+      "contributor",
+    );
+
+    expect(mdx).toContain('category: "skills"');
+    expect(mdx).toContain('submittedBy: "@contributor"');
+    expect(mdx).not.toContain("README.md");
+    expect(mdx).not.toContain("apps/web/public/data");
+    expect(mdx).toContain(
+      "Useful source-backed skill.\n\n## Safety\n\nReview scripts before running.",
+    );
+  });
+
+  it("preserves multiline copy snippets as YAML block scalars", () => {
+    const mdx = buildContributorMdx({
+      category: "guides",
+      name: "Multiline Guide",
+      slug: "multiline-guide",
+      description: "Guide with source content.",
+      docs_url: "https://example.com/docs",
+      full_copyable_content: "Step one\nStep two\nStep three",
+      safety_notes: "Review before running.",
+      privacy_notes: "No data collection.",
+    });
+
+    expect(mdx).toContain(
+      "copySnippet: |\n  Step one\n  Step two\n  Step three",
+    );
+    expect(mdx).not.toContain("Step one\\nStep two\\nStep three");
+  });
+
+  it("escapes contributor body text before writing MDX", () => {
+    const mdx = buildContributorMdx({
+      category: "guides",
+      name: "Unsafe MDX",
+      description: "<script>{danger}</script>",
+      guide_content: "import X from 'unsafe'\n<Component />",
+      safety_notes: "<Danger /> {run}",
+      privacy_notes: "[track](javascript:alert(1))",
+    });
+
+    const body = mdx.split("---\n").slice(2).join("---\n");
+    expect(body).not.toContain("<script>");
+    expect(body).not.toContain("<Component");
+    expect(body).not.toContain("{run}");
+    expect(body).toContain("&lt;script&gt;&#123;danger&#125;&lt;/script&gt;");
+    expect(body).toContain("\\import X from 'unsafe'");
+  });
+
+  it("rejects PKCS#1 GitHub App private keys with a conversion hint", async () => {
+    await expect(
+      createGitHubAppJwt({
+        appId: "123",
+        privateKeyPem: [
+          "-----BEGIN RSA",
+          "PRIVATE KEY-----\nZmFrZQ==\n-----END RSA",
+          "PRIVATE KEY-----",
+        ].join(" "),
+        now: 1_780_300_000_000,
+      }),
+    ).rejects.toThrow("GITHUB_APP_PRIVATE_KEY must be a PKCS#8 PEM block");
+  });
+
+  it("classifies required check state before private review can run", async () => {
+    const fetchMock = vi.fn(async (url: string | URL | Request) => {
+      expect(String(url)).toContain(
+        "/repos/JSONbored/awesome-claude/commits/abc123/check-runs",
+      );
+      return Response.json({
+        check_runs: [
+          {
+            name: "validate-content",
+            status: "completed",
+            conclusion: "success",
+            completed_at: "2026-06-02T00:00:00Z",
+          },
+        ],
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      getCommitValidationState({
+        token: "ghs_test",
+        repo: { owner: "JSONbored", repo: "awesome-claude" },
+        ref: "abc123",
+        requiredChecks: ["validate-content"],
+      }),
+    ).resolves.toMatchObject({
+      state: "passed",
+      checks: [{ name: "validate-content", status: "passed" }],
+    });
+  });
+
+  it("keeps private review behind required PR validation", () => {
+    const source = readWorkerSource();
+    const validationIndex = source.indexOf("getCommitValidationState({");
+    const privateReviewIndex = source.indexOf("reviewWithPrivateGate(env, {");
+
+    expect(source).toContain(
+      'const DEFAULT_REQUIRED_VALIDATION_CHECKS = [\n  "validate-content",\n  "Superagent Security Scan",\n]',
+    );
+    expect(source).toContain('"check_run"');
+    expect(source).toContain('"check_suite"');
+    expect(source).toContain('"status"');
+    expect(source).toContain('status: "validation_pending"');
+    expect(source).toContain("validation: validationForPrivateReview");
+    expect(source).toContain("contentScope: contentScopeForPrivateReview");
+    expect(source).toContain("duplicateHistoryRequired: true");
+    expect(validationIndex).toBeGreaterThan(0);
+    expect(privateReviewIndex).toBeGreaterThan(validationIndex);
+  });
+
+  it("allows only trusted maintainer comments to trigger rechecks", () => {
+    const source = readWorkerSource();
+    const issueCommentIndex = source.indexOf(
+      'if (eventName === "issue_comment")',
+    );
+    const issueCommentBlock = source.slice(
+      issueCommentIndex,
+      source.indexOf("if (VALIDATION_WEBHOOK_EVENTS", issueCommentIndex),
+    );
+
+    expect(source).toContain('if (eventName === "issue_comment")');
+    expect(source).toContain('split(/\\s+/)[0] === "/recheck"');
+    expect(source).toContain("TRUSTED_RECHECK_ASSOCIATIONS");
+    expect(source).toContain('"OWNER"');
+    expect(source).toContain('"MEMBER"');
+    expect(source).toContain('"COLLABORATOR"');
+    expect(source).toContain("targetFromIssueCommentRecheck");
+    expect(issueCommentBlock).toContain("true,\n      true,");
+  });
+
+  it("renders Taopedia-style verdict comments with stable sections", () => {
+    const body = markerComment({
+      verdict: "request_changes",
+      summary: [
+        "Summary:",
+        "- Reviewed `content/guides/example.mdx` as a single-entry guide submission.",
+        "",
+        "Source Review:",
+        "- Blocking source issue.",
+        "",
+        "Recommended Action:",
+        "- Close and resubmit a focused PR.",
+      ].join("\n"),
+      labels: ["submission-needs-changes"],
+      close: true,
+    });
+
+    expect(body).toContain(
+      "<!-- heyclaude-submission-gate -->\nVerdict: Request changes\n\nSummary:",
+    );
+    expect(body).toContain("Source Review:");
+    expect(body).toContain("Recommended Action:");
+    expect(body).toContain("single-shot submission review");
+  });
+
+  it("renders accepted submissions as direct merge decisions", () => {
+    const body = markerComment({
+      verdict: "merge",
+      summary:
+        "Summary:\n- Accepted after duplicate/history and source review.",
+      labels: ["submission-merged-by-gate"],
+    });
+
+    expect(body).toContain("Verdict: Accepted and merged");
+    expect(body).toContain(
+      "passed content validation, Superagent, and private review",
+    );
+    expect(body).toContain("merges accepted source PRs directly");
+  });
+
+  it("reconciles old verdict labels before applying a new gate decision", () => {
+    const source = readWorkerSource();
+    const removeIndex = source.indexOf("await removeLabels({");
+    const addIndex = source.indexOf("await addLabels({", removeIndex);
+
+    expect(source).toContain("const DECISION_LABELS = [");
+    expect(source).toContain("!labelsToApply.includes(label)");
+    expect(removeIndex).toBeGreaterThan(0);
+    expect(addIndex).toBeGreaterThan(removeIndex);
+  });
+
+  it("does not apply the merged label before direct merge succeeds", () => {
+    const source = readWorkerSource();
+
+    expect(source).toContain(
+      'const status =\n        decision.verdict === "merge" ? "merge_accepted" : decision.verdict',
+    );
+    expect(source).toContain("label !== LABELS.merged");
+    expect(source).toContain("label !== LABELS.importOpen");
+    expect(source).toContain("label !== LABELS.superseded");
+    expect(source).toContain('status: "merged"');
+    expect(source).toContain("await mergeAcceptedPullRequest({");
+    expect(source).toContain("SubmissionMergePendingError");
+    expect(source).toContain('decision: "merge_pending"');
+    expect(source).toContain("message.retry({ delaySeconds: 30 })");
+  });
+
+  it("keeps one-shot gate verdicts from being overwritten by later check events", () => {
+    const source = readWorkerSource();
+    const enqueueIndex = source.indexOf("async function enqueueReviewTarget");
+    const enqueueReadIndex = source.indexOf(
+      "getPrState(env.SUBMISSION_GATE_DB",
+      enqueueIndex,
+    );
+    const enqueueWriteIndex = source.indexOf(
+      "await upsertPrState(env.SUBMISSION_GATE_DB",
+      enqueueIndex,
+    );
+    const reviewIndex = source.indexOf('if (message.kind === "review_pr")');
+    const reviewReadIndex = source.indexOf(
+      "getPrState(env.SUBMISSION_GATE_DB",
+      reviewIndex,
+    );
+    const validationIndex = source.indexOf(
+      "getCommitValidationState({",
+      reviewIndex,
+    );
+    const terminalSetIndex = source.indexOf("const TERMINAL_GATE_VERDICTS");
+    const terminalSetEndIndex = source.indexOf("]);", terminalSetIndex);
+    const terminalSetBlock = source.slice(
+      terminalSetIndex,
+      terminalSetEndIndex,
+    );
+
+    expect(source).toContain("const TERMINAL_GATE_VERDICTS = new Set");
+    expect(source).toContain("function hasTerminalGateDecision");
+    expect(terminalSetBlock).not.toContain('"request_changes"');
+    expect(terminalSetBlock).not.toContain('"merge"');
+    expect(source).toContain("forceRecheck = false");
+    expect(source).toContain(
+      "payload: { eventName, deliveryId, target, webhook, forceRecheck }",
+    );
+    expect(source).toContain(
+      'String(message.payload.eventName || "") === "issue_comment"',
+    );
+    expect(source).toContain('String(state.status || "") === "merged"');
+    expect(source).toContain('String(state.status || "") === "import_pr_open"');
+    expect(source).toContain('String(state.verdict || "") === "import"');
+    expect(source).toContain('typeof state.importPrUrl === "string"');
+    expect(source).toContain(
+      "Skipped because this submission already has a terminal gate decision.",
+    );
+    expect(enqueueReadIndex).toBeGreaterThan(enqueueIndex);
+    expect(enqueueWriteIndex).toBeGreaterThan(enqueueReadIndex);
+    expect(reviewReadIndex).toBeGreaterThan(reviewIndex);
+    expect(validationIndex).toBeGreaterThan(reviewReadIndex);
+  });
+
+  it("merges accepted direct content PRs instead of creating import PRs", () => {
+    const source = readWorkerSource();
+
+    expect(source).toContain("async function directContentScopeForPr");
+    expect(source).toContain("async function mergeAcceptedPullRequest");
+    expect(source).toContain("approvePullRequest({");
+    expect(source).toContain("mergePullRequest({");
+    expect(source).toContain("listPullRequestFiles({");
+    expect(source).toContain(
+      "Direct content submissions must change exactly one source content file.",
+    );
+    expect(source).toContain('finalAction: "merge_or_close"');
+    expect(source).not.toContain(
+      "importJob: await synthesizeImportJobFromSourcePr",
+    );
+    expect(source).not.toContain(
+      "Private review accepted this source, but did not return an import job.",
+    );
+  });
+
+  it("runs container imports asynchronously and completes them by signed callback", () => {
+    const source = readWorkerSource();
+
+    expect(source).toContain("SUBMISSION_GATE_URL");
+    expect(source).toContain("callbackUrl:");
+    expect(source).toContain("const runnerKey");
+    expect(source).toContain(
+      "env.SUBMISSION_IMPORT_RUNNER.getByName(runnerKey)",
+    );
+    expect(source).toContain("response.status === 202 || result.accepted");
+    expect(source).toContain('decision: "import_queued"');
+    expect(source).toContain("async function completeImportPr");
+    expect(source).toContain("async function importCompleteRoute");
+    expect(source).toContain('error: "missing_import_source"');
+    expect(source).toContain('decision: "import_failed"');
+  });
+
+  it("ignores maintainer-owned import PR branches during gate review", () => {
+    const source = readWorkerSource();
+
+    expect(source).toContain(
+      'const MAINTAINER_IMPORT_BRANCH_PREFIX = "automation/submission-pr-"',
+    );
+    expect(source).toContain("function isMaintainerImportRef");
+    expect(source).toContain("isMaintainerImportRef(pull.head?.ref)");
+    expect(source).toContain("isMaintainerImportRef(target.headRef)");
+  });
+
+  it("signs internal import callbacks with the same HMAC verifier", async () => {
+    const payload = JSON.stringify({ kind: "import_pr", targetKey: "repo#1" });
+    const signature = await signInternalPayload("internal-secret", payload);
+
+    await expect(
+      verifyInternalSignature({
+        secret: "internal-secret",
+        payload,
+        signatureHeader: signature,
+      }),
+    ).resolves.toBe(true);
+  });
+
+  it("encrypts short-lived GitHub user token handoffs", async () => {
+    const encrypted = await encryptText("handoff-secret", "ghu_example");
+
+    expect(encrypted).not.toContain("ghu_example");
+    expect(encrypted.split(".")).toHaveLength(3);
+    await expect(decryptText("handoff-secret", encrypted)).resolves.toBe(
+      "ghu_example",
+    );
+  });
+
+  it("redacts draft PII before writing long-lived R2 audit objects", () => {
+    const source = readWorkerSource();
+    expect(source).toContain("fields: redactPublicDraftFields(fields)");
+  });
+
+  it("rejects cancelled GitHub authorization callbacks before token exchange", () => {
+    const source = readWorkerSource();
+    const callbackSource =
+      source.match(
+        /async function githubCallbackRoute[\s\S]*?\nfunction isPilotPr/,
+      )?.[0] || "";
+    const guardIndex = callbackSource.indexOf("if (providerError || !code)");
+    const exchangeIndex = callbackSource.indexOf("exchangeGitHubUserCode");
+
+    expect(guardIndex).toBeGreaterThan(0);
+    expect(exchangeIndex).toBeGreaterThan(guardIndex);
+  });
+
+  it("fails closed when webhook signing is not configured", () => {
+    const source = readWorkerSource();
+    const guardIndex = source.indexOf("if (!env.GITHUB_WEBHOOK_SECRET)");
+    const verifyIndex = source.indexOf("verifyGitHubWebhookSignature({");
+
+    expect(guardIndex).toBeGreaterThan(0);
+    expect(verifyIndex).toBeGreaterThan(guardIndex);
+    expect(source).toContain('error: "webhook_secret_not_configured"');
+    expect(source).toContain("secret: env.GITHUB_WEBHOOK_SECRET,");
+  });
+});

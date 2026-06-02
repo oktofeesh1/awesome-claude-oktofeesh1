@@ -355,8 +355,8 @@ describe("HeyClaude remote MCP route", () => {
     expect(result).toMatchObject({
       ok: true,
       valid: true,
-      githubIssueUrl: expect.stringContaining("template=submit-mcp.yml"),
-      reviewModel: expect.stringContaining("Issue-first"),
+      reviewUrl: expect.stringContaining("https://heyclau.de/submit"),
+      reviewModel: expect.stringContaining("PR-first"),
     });
     expect(JSON.stringify(result)).not.toMatch(/token|secret|authorization/i);
   });
@@ -391,11 +391,11 @@ describe("HeyClaude remote MCP route", () => {
     expect(result).toMatchObject({
       ok: true,
       valid: true,
-      githubIssueUrl: expect.stringContaining("template=submit-guide.yml"),
-      issueDraft: {
+      reviewUrl: expect.stringContaining("https://heyclau.de/submit"),
+      prDraft: {
         body: expect.stringContaining("### Guide content"),
       },
-      submissionPolicy: expect.stringContaining("does not auto-merge"),
+      submissionPolicy: expect.stringContaining("may be merged automatically"),
       artifactPolicy: expect.stringContaining("quarantine/review"),
     });
     expect(JSON.stringify(result)).not.toMatch(

@@ -1,7 +1,6 @@
 import categorySpec from "./category-spec.json" with { type: "json" };
-import { submissionLabelsForCategory } from "./submission-labels.js";
 
-export const SUBMISSION_SPEC_SCHEMA_VERSION = 2;
+export const SUBMISSION_SPEC_SCHEMA_VERSION = 3;
 
 const RISK_BEARING_SUBMISSION_CATEGORIES = new Set([
   "mcp",
@@ -79,7 +78,7 @@ const BASE_FIELDS = [
     required: false,
     placeholder: "@github-handle or email if you want it public",
     helpText:
-      "Optional. This is copied into a public GitHub issue, so do not include private contact details.",
+      "Optional. This may be copied into a public GitHub PR, so do not include private contact details.",
   },
   {
     id: "tags",
@@ -324,44 +323,33 @@ export function buildSubmissionFieldModel(category) {
   };
 }
 
-export function buildIssueTemplateSpec(category) {
-  const model = buildSubmissionFieldModel(category);
-  if (!model) return null;
-
-  return {
-    schemaVersion: SUBMISSION_SPEC_SCHEMA_VERSION,
-    category,
-    template: model.template,
-    labels: submissionLabelsForCategory(category),
-    title: `Submit ${model.label.replace(/s$/, "")}: `,
-    fields: model.fields.map((field) => ({
-      id: field.id,
-      label: field.label,
-      type: field.type,
-      required: Boolean(field.required),
-      options: field.options,
-      render: field.render,
-    })),
-  };
+function submitUrlForOrigin(origin) {
+  if (!origin) return "";
+  try {
+    const url = new URL("/submit", origin);
+    if (url.protocol !== "https:" && url.protocol !== "http:") return "";
+    return url.toString();
+  } catch {
+    return "";
+  }
 }
 
-export function buildSubmissionSpecs() {
+export function buildSubmissionSpecs(options = {}) {
   const categories = Object.fromEntries(
     categorySpec.submissionOrder.map((category) => [
       category,
       buildSubmissionFieldModel(category),
     ]),
   );
-  const issueTemplates = Object.fromEntries(
-    categorySpec.submissionOrder.map((category) => [
-      category,
-      buildIssueTemplateSpec(category),
-    ]),
-  );
 
+  const submitUrl = submitUrlForOrigin(options.siteUrl || options.origin);
   return {
     schemaVersion: SUBMISSION_SPEC_SCHEMA_VERSION,
     categories,
-    issueTemplates,
+    prIntake: {
+      mode: "github_app_user_fork_pr",
+      ...(submitUrl ? { submitUrl } : {}),
+      pilotBaseRef: "submission-gate-pilot",
+    },
   };
 }

@@ -45,6 +45,7 @@ function changedFiles() {
 
 const files = changedFiles();
 const all = forceFull;
+const headRef = process.env.GITHUB_HEAD_REF || process.env.HEAD_REF || "";
 
 function touches(...patterns) {
   if (all) return true;
@@ -70,6 +71,20 @@ function contentCategoriesFromFiles() {
 
 const contentCategories = contentCategoriesFromFiles();
 const contentCategoryTouched = contentCategories.length > 0;
+const sourceContentOnly =
+  eventName === "pull_request" &&
+  !all &&
+  files.length > 0 &&
+  files.every((file) => /^content\/[^/]+\/[^/]+\.mdx$/i.test(file));
+const maintainerImport =
+  sourceContentOnly && /^automation\/submission-pr-\d+-/i.test(headRef);
+const directSubmission =
+  eventName === "pull_request" &&
+  !all &&
+  files.length === 1 &&
+  contentCategories.length === 1 &&
+  /^content\/[^/]+\/[^/]+\.mdx$/i.test(files[0]) &&
+  !maintainerImport;
 const contentValidationInfra = touches(
   /^examples\/content\//,
   /^\.github\/ISSUE_TEMPLATE\//,
@@ -87,27 +102,36 @@ const generatedArtifactInfra = touches(
 const submissionAutomationInfra = touches(
   /^scripts\/(analyze-submission-risk|import-submission-issue|validate-submission-issue)\.mjs$/,
 );
+const submissionGateInfra = touches(
+  /^apps\/submission-gate\//,
+  /^tests\/submission-gate-.*\.test\.ts$/,
+);
 
 const flags = {
+  direct_submission: directSubmission,
+  maintainer_import: maintainerImport,
+  source_content_only: sourceContentOnly,
   content: contentCategoryTouched || contentValidationInfra,
   content_config: contentValidationInfra,
   registry:
-    contentCategoryTouched ||
-    generatedArtifactInfra ||
-    submissionAutomationInfra,
+    !directSubmission &&
+    (contentCategoryTouched ||
+      generatedArtifactInfra ||
+      submissionAutomationInfra),
   web:
-    contentCategoryTouched ||
-    submissionAutomationInfra ||
-    touches(
-      /^apps\/web\//,
-      /^emails\//,
-      /^cloudflare\/api-schema-heyclaude-openapi\.yaml$/,
-      /^scripts\/(generate-openapi|validate-d1-jobs|validate-deployment-artifacts)\.(mjs|ts)$/,
-      /^tests\/(api-|commercial-intake|discovery-surfaces|seo-jsonld|submission-api|submission-workflows|votes-api).*\.test\.ts$/,
-      "vitest.config.ts",
-      "package.json",
-      "pnpm-lock.yaml",
-    ),
+    !directSubmission &&
+    (contentCategoryTouched ||
+      submissionAutomationInfra ||
+      touches(
+        /^apps\/web\//,
+        /^emails\//,
+        /^cloudflare\/api-schema-heyclaude-openapi\.yaml$/,
+        /^scripts\/(generate-openapi|validate-d1-jobs|validate-deployment-artifacts)\.(mjs|ts)$/,
+        /^tests\/(api-|commercial-intake|discovery-surfaces|seo-jsonld|submission-api|submission-workflows|votes-api).*\.test\.ts$/,
+        "vitest.config.ts",
+        "package.json",
+        "pnpm-lock.yaml",
+      )),
   mcp: touches(
     /^packages\/mcp\//,
     /^apps\/web\/src\/routes\/api\/mcp\.ts$/,
@@ -117,15 +141,16 @@ const flags = {
     "pnpm-lock.yaml",
   ),
   raycast:
-    contentCategoryTouched ||
-    touches(
-      /^integrations\/raycast\//,
-      /^apps\/web\/public\/data\/raycast/,
-      /^scripts\/(build-content-index|validate-raycast-feed)\.mjs$/,
-      /^tests\/registry-artifacts\.test\.ts$/,
-      "package.json",
-      "pnpm-lock.yaml",
-    ),
+    !directSubmission &&
+    (contentCategoryTouched ||
+      touches(
+        /^integrations\/raycast\//,
+        /^apps\/web\/public\/data\/raycast/,
+        /^scripts\/(build-content-index|validate-raycast-feed)\.mjs$/,
+        /^tests\/registry-artifacts\.test\.ts$/,
+        "package.json",
+        "pnpm-lock.yaml",
+      )),
   packages: touches(
     /^apps\/web\/public\/downloads\//,
     /^content\/skills\/.*\.zip$/,
@@ -134,6 +159,9 @@ const flags = {
     "package.json",
     "pnpm-lock.yaml",
   ),
+  submission_gate:
+    submissionGateInfra ||
+    touches("package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml"),
   ci:
     submissionAutomationInfra ||
     touches(

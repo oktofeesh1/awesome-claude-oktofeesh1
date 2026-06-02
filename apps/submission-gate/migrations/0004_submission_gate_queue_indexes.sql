@@ -1,0 +1,2 @@
+-- Reserved for dev database migration history compatibility.
+-- Idempotency is handled by Durable Object locks and import PR lookup.

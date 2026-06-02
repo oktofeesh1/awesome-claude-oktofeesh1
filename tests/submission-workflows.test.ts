@@ -61,6 +61,8 @@ describe("submission automation workflows", () => {
           FORCE_FULL_VALIDATION: "0",
           GITHUB_EVENT_NAME: "pull_request",
           GITHUB_OUTPUT: outputPath,
+          GITHUB_HEAD_REF: "contributor/source-entry",
+          HEAD_REF: "contributor/source-entry",
         },
       },
     );
@@ -209,52 +211,26 @@ describe("submission automation workflows", () => {
     expect(source).toContain("pnpm build");
     expect(source).not.toContain("pnpm test:e2e");
     expect(source).not.toContain("playwright install");
-    expect(source).toContain(
-      "PREVIEW_DEPLOYMENT_URL: ${{ steps.deploy-preview.outputs.base-url }}",
-    );
-    expect(source).not.toContain(
-      "steps.deploy-preview.outputs.base-url || env.CLOUDFLARE_DEV_WORKER_URL",
-    );
+    expect(source).toContain("Resolve PR preview URL");
+    expect(source).toContain("--wait-seconds 600");
+    expect(source).not.toContain("CLOUDFLARE_API_TOKEN");
+    expect(source).not.toContain("CLOUDFLARE_ACCOUNT_ID");
+    expect(source).not.toContain("pnpm --filter web run deploy:dev");
+    expect(source).not.toContain("PREVIEW_DEPLOYMENT_URL:");
   });
 
-  it("keeps public issue validation read-only for imports", () => {
-    const source = fs.readFileSync(
-      path.join(repoRoot, ".github/workflows/submission-issue-validation.yml"),
-      "utf8",
-    );
-
-    expect(source).toContain("contents: read");
-    expect(source).toContain("issues: write");
-    expect(source).not.toContain("actions: write");
-    expect(source).not.toContain("contents: write");
-    expect(source).not.toContain("pull-requests: write");
-    expect(source).toContain("Preview import output");
-    expect(source).toContain("--dry-run");
-    expect(source).toContain("Analyze submission risk");
-    expect(source).toContain("Precheck auto-import eligibility");
-    expect(source).toContain("auto-import-eligible");
-    expect(source).toContain("HeyClaude Submission Bot");
-    expect(source).toContain("steps.auto_import_precheck.outputs.eligible");
-    expect(source).toContain("managedValidationLabels");
-    expect(source).toContain(
-      "if (label && !riskLabels.has(label)) labels.add(label);",
-    );
-    expect(source).toContain("issues.setLabels");
-    expect(source).toContain("Post HeyClaude submission check comment");
-    expect(source).toContain("<!-- heyclaude-submission-check -->");
-    expect(source).toContain("!github.event.issue.pull_request");
-    expect(source).toContain("schema passed, maintainer review required");
-    expect(source).not.toContain("submission check: passed");
-    expect(source).not.toContain("Post risk report comment");
-    expect(source).toContain("Fail when submission risk is critical");
-    expect(source).toContain("Summarize invalid submission issue");
-    expect(source).toContain("--informational");
-    expect(source).not.toContain("if (report.skipped) return;");
-    expect(source).not.toContain("Import auto-eligible submission");
-    expect(source).not.toContain("Create auto-import PR");
-    expect(source).not.toContain("peter-evans/create-pull-request");
-    expect(source).not.toContain("gh workflow run content-validation.yml");
-    expect(source).not.toContain("labels.*.name, 'submission'");
+  it("removes public issue intake workflows from GitHub Actions", () => {
+    for (const workflow of [
+      "submission-issue-validation.yml",
+      "submission-import-pr.yml",
+      "submission-stale.yml",
+      "submission-queue.yml",
+    ]) {
+      expect(
+        fs.existsSync(path.join(repoRoot, ".github/workflows", workflow)),
+        workflow,
+      ).toBe(false);
+    }
   });
 
   it("does not fail issue CI for invalid user submissions", () => {
@@ -586,56 +562,18 @@ describe("submission automation workflows", () => {
     expect(source).toContain("enabled: true");
   });
 
-  it("opens import PRs only after accepted/import-approved labels", () => {
-    const source = fs.readFileSync(
-      path.join(repoRoot, ".github/workflows/submission-import-pr.yml"),
+  it("keeps import PR generation out of public issue workflows", () => {
+    expect(
+      fs.existsSync(
+        path.join(repoRoot, ".github/workflows/submission-import-pr.yml"),
+      ),
+    ).toBe(false);
+    const gateConfig = fs.readFileSync(
+      path.join(repoRoot, "apps/submission-gate/wrangler.jsonc"),
       "utf8",
     );
-
-    expect(source).toContain("types:");
-    expect(source).toContain("- labeled");
-    expect(source).toContain("'accepted'");
-    expect(source).toContain("'import-approved'");
-    expect(source).toContain(
-      "contains(github.event.issue.labels.*.name, 'content-submission')",
-    );
-    expect(source).toContain("scripts/import-submission-issue.mjs");
-    expect(source).toContain("Analyze submission risk");
-    expect(source).toContain("Check approved import eligibility");
-    expect(source).toContain("--fail-on-ineligible");
-    expect(source).toContain("Format imported content");
-    expect(source).toContain("pnpm exec prettier --write");
-    expect(source).toContain("pnpm --filter web run prebuild");
-    expect(source).toContain("pnpm generate:readme");
-    expect(source).toContain("pnpm validate:content:strict");
-    expect(source).toContain("pnpm scan:packages");
-    expect(source).toContain("peter-evans/create-pull-request@");
-    expect(source).toContain('setOutput("branch", `automation/submission-');
-    expect(source).toContain("actions: write");
-    expect(source).toContain("Trigger content validation for import PR");
-    expect(source).toContain(
-      'gh workflow run content-validation.yml --ref "$VALIDATION_REF"',
-    );
-    expect(source).toContain('setOutput("pr_title", `feat(content): add');
-    expect(source).toContain('setOutput("issue_author", issueAuthor)');
-    expect(source).toContain(
-      'setOutput("issue_author_handle", issueAuthorHandle)',
-    );
-    expect(source).toContain('setOutput("issue_author_id", issueAuthorId)');
-    expect(source).toContain("Original submitter:");
-    expect(source).toContain(
-      "by ${{ steps.metadata.outputs.issue_author_handle }}",
-    );
-    expect(source).toContain("Co-authored-by:");
-    expect(source).toContain(
-      "Maintainer-approved import PR opened for ${{ steps.metadata.outputs.issue_author_handle }}",
-    );
-    expect(source).toContain("content/**");
-    expect(source).toContain("apps/web/public/data/**");
-    expect(source).toContain("README.md");
-    expect(source).toContain(
-      "Closes #${{ steps.metadata.outputs.issue_number }} after merge.",
-    );
+    expect(gateConfig).toContain('"SUBMISSION_IMPORT_QUEUE"');
+    expect(gateConfig).toContain('"SubmissionImportRunner"');
   });
 
   it("requires preview artifact validation before pull requests can merge", () => {
@@ -655,9 +593,12 @@ describe("submission automation workflows", () => {
     expect(source).toContain("trunk check --ci --all");
     expect(source).toContain("validate-pr-preview:");
     expect(source).toContain("github.event_name == 'pull_request'");
-    expect(source).toContain("Deploy same-repo PR preview to dev Worker");
     expect(source).toContain("Resolve PR preview URL");
+    expect(source).toContain("--wait-seconds 600");
     expect(source).toContain("pnpm validate:deployment-artifacts");
+    expect(source).toContain("pnpm validate:mcp-endpoint");
+    expect(source).not.toContain("Deploy same-repo PR preview to dev Worker");
+    expect(source).not.toContain("CLOUDFLARE_API_TOKEN");
     expect(source).not.toContain("vars.DEPLOYMENT_ARTIFACT_BASE_URL");
     expect(source).toContain("Dry-run Resend template sync");
     expect(source).toContain("pnpm resend:sync-templates -- --dry-run");
@@ -698,7 +639,25 @@ describe("submission automation workflows", () => {
     );
   });
 
-  it("routes hook-only content PRs through hook and public artifact validation", () => {
+  it("keeps source-only import diffs focused on content and build artifacts", () => {
+    const source = fs.readFileSync(
+      path.join(repoRoot, ".github/workflows/content-validation.yml"),
+      "utf8",
+    );
+
+    expect(source).toContain(
+      "Verify source-only imports produce only build artifacts",
+    );
+    expect(source).toContain("git checkout -- pnpm-lock.yaml");
+    expect(source).toContain(
+      "grep -Ev '^(README\\.md|apps/web/public/data/.*|apps/web/src/generated/.*|apps/web/src/routeTree\\.gen\\.ts)$'",
+    );
+    expect(source).toContain(
+      "Content import generation changed non-generated files",
+    );
+  });
+
+  it("routes hook-only content PRs through focused direct submission validation", () => {
     const lanes = runClassifierForChangedFiles({
       "content/hooks/retro-daily.mdx": contentFixture(`
 title: Retro Daily
@@ -710,10 +669,11 @@ description: Daily Claude Code retro dashboard hook.
 
     expect(lanes.content).toBe("true");
     expect(lanes.content_categories_json).toBe('["hooks"]');
-    expect(lanes.registry).toBe("true");
-    expect(lanes.web).toBe("true");
+    expect(lanes.direct_submission).toBe("true");
+    expect(lanes.registry).toBe("false");
+    expect(lanes.web).toBe("false");
     expect(lanes.mcp).toBe("false");
-    expect(lanes.raycast).toBe("true");
+    expect(lanes.raycast).toBe("false");
     expect(lanes.packages).toBe("false");
   });
 
@@ -1271,40 +1231,31 @@ description: Example description
     expect(summary).not.toContain("by @");
   });
 
-  it("shows security/safety context in submission queue summaries", () => {
+  it("moves submission queue context into the private gate docs", () => {
+    expect(
+      fs.existsSync(
+        path.join(repoRoot, ".github/workflows/submission-queue.yml"),
+      ),
+    ).toBe(false);
+
     const source = fs.readFileSync(
-      path.join(repoRoot, ".github/workflows/submission-queue.yml"),
+      path.join(repoRoot, "docs/submission-queue-ops.md"),
       "utf8",
     );
 
-    expect(source).toContain(
-      "| Issue | Group | Status | Security | Policy | Source | Contributor | Age | Category | Slug | Action | Notes |",
-    );
-    expect(source).toContain("entry.riskSummary");
-    expect(source).toContain("entry.riskFlags");
-    expect(source).toContain("entry.riskTier");
-    expect(source).toContain("entry.policyDecision");
-    expect(source).toContain("entry.sourceState");
-    expect(source).toContain("entry.contributorReview");
-    expect(source).toContain("entry.maintainerActions");
+    expect(source).toContain("source of truth");
+    expect(source).toContain("safety");
+    expect(source).toContain("provenance");
+    expect(source).toContain("duplicates");
+    expect(source).toContain("generated-artifact");
   });
 
-  it("keeps stale submission automation review-only and label-scoped", () => {
-    const source = fs.readFileSync(
-      path.join(repoRoot, ".github/workflows/submission-stale.yml"),
-      "utf8",
-    );
-
-    expect(source).toContain("Submission Stale Manager");
-    expect(source).toContain("issues: write");
-    expect(source).toContain("workflow_dispatch:");
-    expect(source).not.toContain("inputs:");
-    expect(source).not.toContain("inputs.");
-    expect(source).toContain("pnpm submission:stale");
-    expect(source).toContain("--apply");
-    expect(source).not.toContain("import-approved");
-    expect(source).not.toContain("scripts/import-submission-issue.mjs");
-    expect(source).not.toContain("peter-evans/create-pull-request");
+  it("removes stale issue automation from public workflows", () => {
+    expect(
+      fs.existsSync(
+        path.join(repoRoot, ".github/workflows/submission-stale.yml"),
+      ),
+    ).toBe(false);
   });
 
   it("blocks stale source checks from fetching non-public issue URLs", async () => {
@@ -1444,7 +1395,7 @@ description: Example description
     expect(source).toContain("content_categories_json");
   });
 
-  it("routes hook-only content PRs to hook content and public artifact validation", () => {
+  it("routes hook-only content PRs to hook content and direct submission validation", () => {
     const outputs = runClassifierForChangedFiles({
       "content/hooks/retro-daily.mdx": "---\ntitle: Retro Daily\n---\n",
     });
@@ -1453,11 +1404,12 @@ description: Example description
     expect(outputs.content_hooks).toBe("true");
     expect(outputs.content_mcp).toBe("false");
     expect(outputs.content_categories_json).toBe('["hooks"]');
-    expect(outputs.web).toBe("true");
+    expect(outputs.direct_submission).toBe("true");
+    expect(outputs.web).toBe("false");
     expect(outputs.mcp).toBe("false");
-    expect(outputs.raycast).toBe("true");
+    expect(outputs.raycast).toBe("false");
     expect(outputs.packages).toBe("false");
-    expect(outputs.registry).toBe("true");
+    expect(outputs.registry).toBe("false");
     expect(outputs.ci).toBe("false");
   });
 

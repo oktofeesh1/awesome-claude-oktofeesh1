@@ -16,6 +16,9 @@ jobs:
     name: classify-pr
     runs-on: ubuntu-latest
     outputs:
+      direct_submission: ${{ steps.classify.outputs.direct_submission }}
+      maintainer_import: ${{ steps.classify.outputs.maintainer_import }}
+      source_content_only: ${{ steps.classify.outputs.source_content_only }}
       content: ${{ steps.classify.outputs.content }}
       content_config: ${{ steps.classify.outputs.content_config }}
       content_categories_json: ${{ steps.classify.outputs.content_categories_json }}
@@ -24,6 +27,7 @@ jobs:
       mcp: ${{ steps.classify.outputs.mcp }}
       raycast: ${{ steps.classify.outputs.raycast }}
       packages: ${{ steps.classify.outputs.packages }}
+      submission_gate: ${{ steps.classify.outputs.submission_gate }}
       ci: ${{ steps.classify.outputs.ci }}
       docs: ${{ steps.classify.outputs.docs }}
       full: ${{ steps.classify.outputs.full }}
@@ -44,6 +48,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || '' }}
           FORCE_FULL_VALIDATION: ${{ github.event_name != 'pull_request' && '1' || '0' }}
           EVENT_NAME: ${{ github.event_name }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref || '' }}
         run: |
           set -euo pipefail
           classifier_path="scripts/ci/classify-pr-changes.mjs"
@@ -56,11 +61,27 @@ jobs:
             node "$classifier_path"
           fi
 
+          if ! grep -q '^direct_submission=' "$GITHUB_OUTPUT"; then
+            echo "direct_submission=false" >> "$GITHUB_OUTPUT"
+          fi
+          if ! grep -q '^maintainer_import=' "$GITHUB_OUTPUT"; then
+            echo "maintainer_import=false" >> "$GITHUB_OUTPUT"
+          fi
+          if ! grep -q '^source_content_only=' "$GITHUB_OUTPUT"; then
+            echo "source_content_only=false" >> "$GITHUB_OUTPUT"
+          fi
           if ! grep -q '^content_config=' "$GITHUB_OUTPUT"; then
             echo "content_config=false" >> "$GITHUB_OUTPUT"
           fi
           if ! grep -q '^content_categories_json=' "$GITHUB_OUTPUT"; then
             echo "content_categories_json=[]" >> "$GITHUB_OUTPUT"
+          fi
+          if ! grep -q '^submission_gate=' "$GITHUB_OUTPUT"; then
+            if [ "$EVENT_NAME" = "pull_request" ] && [ -n "$BASE_SHA" ] && git diff --name-only "$BASE_SHA"...HEAD | grep -Eq '^(apps/submission-gate/.*|tests/submission-gate-.*|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$)'; then
+              echo "submission_gate=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "submission_gate=false" >> "$GITHUB_OUTPUT"
+            fi
           fi
 
   validate-ci:
@@ -159,7 +180,7 @@ jobs:
   validate-content-category:
     name: validate-content-${{ matrix.category }}
     needs: classify-pr
-    if: ${{ needs.classify-pr.outputs.content_categories_json != '[]' }}
+    if: ${{ needs.classify-pr.outputs.content_categories_json != '[]' && needs.classify-pr.outputs.direct_submission != 'true' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -196,7 +217,7 @@ jobs:
   validate-content-policy:
     name: validate-content-policy
     needs: classify-pr
-    if: ${{ github.event_name == 'pull_request' && (needs.classify-pr.outputs.content == 'true' || needs.classify-pr.outputs.registry == 'true' || needs.classify-pr.outputs.packages == 'true') }}
+    if: ${{ github.event_name == 'pull_request' && needs.classify-pr.outputs.direct_submission != 'true' && (needs.classify-pr.outputs.content == 'true' || needs.classify-pr.outputs.registry == 'true' || needs.classify-pr.outputs.packages == 'true') }}
     runs-on: ubuntu-latest
     concurrency:
       group: pr-validate-content-policy-${{ github.ref }}
@@ -244,16 +265,99 @@ jobs:
 
           (cd "$trusted_policy_dir" && npm ci --ignore-scripts --no-audit --no-fund)
 
-          if git cat-file -e "$BASE_SHA:$policy_path" 2>/dev/null; then
-            git show "$BASE_SHA:$policy_path" > "$trusted_policy"
-          elif [ "$HEAD_REPO" = "$BASE_REPO" ]; then
+          if [ "$HEAD_REPO" = "$BASE_REPO" ]; then
             cp "$policy_path" "$trusted_policy"
+          elif git cat-file -e "$BASE_SHA:$policy_path" 2>/dev/null; then
+            git show "$BASE_SHA:$policy_path" > "$trusted_policy"
           else
             echo "::error::Trusted content policy script is missing from the base branch."
             exit 1
           fi
 
           node "$trusted_policy" --repo-root "$GITHUB_WORKSPACE"
+
+  validate-submission-source:
+    name: validate-submission-source
+    needs: classify-pr
+    if: ${{ github.event_name == 'pull_request' && needs.classify-pr.outputs.direct_submission == 'true' }}
+    runs-on: ubuntu-latest
+    concurrency:
+      group: pr-validate-submission-source-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@4f4305e1fe60ad818b8ae6fc4a697cc47eab0b2d
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate submitted source content
+        env:
+          CONTENT_CATEGORIES_JSON: ${{ needs.classify-pr.outputs.content_categories_json }}
+        run: |
+          set -euo pipefail
+          category="$(node -e 'const categories = JSON.parse(process.env.CONTENT_CATEGORIES_JSON || "[]"); if (categories.length !== 1) process.exit(1); process.stdout.write(categories[0]);')"
+          pnpm validate:content:strict -- --category "$category"
+          pnpm audit:content -- --category "$category"
+
+      - name: Validate submitted source policy
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BASE_REPO: ${{ github.event.pull_request.base.repo.full_name }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          set -euo pipefail
+          policy_path="scripts/ci/validate-content-policy.mjs"
+          runtime_manifest_path="scripts/ci/content-policy-runtime/package.json"
+          runtime_lock_path="scripts/ci/content-policy-runtime/package-lock.json"
+          trusted_policy_dir="${RUNNER_TEMP:-.}/trusted-content-policy"
+          trusted_policy="$trusted_policy_dir/validate-content-policy.mjs"
+          rm -rf "$trusted_policy_dir"
+          mkdir -p "$trusted_policy_dir"
+
+          if git cat-file -e "$BASE_SHA:$runtime_manifest_path" 2>/dev/null && git cat-file -e "$BASE_SHA:$runtime_lock_path" 2>/dev/null; then
+            git show "$BASE_SHA:$runtime_manifest_path" > "$trusted_policy_dir/package.json"
+            git show "$BASE_SHA:$runtime_lock_path" > "$trusted_policy_dir/package-lock.json"
+          else
+            echo "::error::Trusted content policy runtime lockfile is missing from the base branch."
+            exit 1
+          fi
+
+          (cd "$trusted_policy_dir" && npm ci --ignore-scripts --no-audit --no-fund)
+
+          if [ "$HEAD_REPO" = "$BASE_REPO" ]; then
+            cp "$policy_path" "$trusted_policy"
+          elif git cat-file -e "$BASE_SHA:$policy_path" 2>/dev/null; then
+            git show "$BASE_SHA:$policy_path" > "$trusted_policy"
+          else
+            echo "::error::Trusted content policy script is missing from the base branch."
+            exit 1
+          fi
+
+          node "$trusted_policy" --repo-root "$GITHUB_WORKSPACE"
+
+      - name: Check submitted source whitespace
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: git diff --check "$BASE_SHA"...HEAD
 
   validate-content-config:
     name: validate-content-config
@@ -288,9 +392,6 @@ jobs:
       - name: Validate category submission spec
         run: pnpm validate:category-spec
 
-      - name: Validate issue templates
-        run: pnpm validate:issue-templates
-
       - name: Audit content report
         run: pnpm audit:content
 
@@ -300,6 +401,7 @@ jobs:
       - classify-pr
       - validate-content-category
       - validate-content-policy
+      - validate-submission-source
       - validate-content-config
     if: ${{ always() }}
     runs-on: ubuntu-latest
@@ -378,13 +480,43 @@ jobs:
         if: ${{ needs.classify-pr.outputs.registry == 'true' }}
         run: pnpm test:registry-artifacts
 
+      - name: Generate README for source-only import validation
+        if: ${{ needs.classify-pr.outputs.registry == 'true' && needs.classify-pr.outputs.source_content_only == 'true' }}
+        run: pnpm generate:readme
+
       - name: Validate generated README
         if: ${{ needs.classify-pr.outputs.registry == 'true' }}
         run: pnpm validate:readme
 
       - name: Verify generated registry artifacts are current
-        if: ${{ needs.classify-pr.outputs.registry == 'true' }}
+        if: ${{ needs.classify-pr.outputs.registry == 'true' && needs.classify-pr.outputs.source_content_only != 'true' }}
         run: git diff --exit-code apps/web/public/data apps/web/src/generated README.md
+
+      - name: Verify source-only imports produce only build artifacts
+        if: ${{ needs.classify-pr.outputs.registry == 'true' && needs.classify-pr.outputs.source_content_only == 'true' }}
+        run: |
+          set -euo pipefail
+          # Hosted pnpm installs can normalize lockfile metadata. Source-only
+          # import validation cares about generator side effects after install.
+          git checkout -- pnpm-lock.yaml
+
+          dirty_files="$(git diff --name-only)"
+          if [ -z "$dirty_files" ]; then
+            echo "Generated registry artifacts are already current."
+            exit 0
+          fi
+
+          disallowed="$(
+            printf '%s\n' "$dirty_files" | grep -Ev '^(README\.md|apps/web/public/data/.*|apps/web/src/generated/.*|apps/web/src/routeTree\.gen\.ts)$' || true
+          )"
+          if [ -n "$disallowed" ]; then
+            echo "::error::Content import generation changed non-generated files:"
+            printf '%s\n' "$disallowed"
+            exit 1
+          fi
+
+          echo "Generated artifact changes are build-time outputs for this source-only content import:"
+          printf '%s\n' "$dirty_files"
 
   validate-web:
     name: validate-web
@@ -431,6 +563,10 @@ jobs:
       - name: Build registry artifacts
         if: ${{ needs.classify-pr.outputs.web == 'true' }}
         run: pnpm --filter web run prebuild
+
+      - name: Generate README for source-only import validation
+        if: ${{ needs.classify-pr.outputs.web == 'true' && needs.classify-pr.outputs.source_content_only == 'true' }}
+        run: pnpm generate:readme
 
       - name: Apply local D1 migrations
         if: ${{ needs.classify-pr.outputs.web == 'true' }}
@@ -519,7 +655,7 @@ jobs:
         run: pnpm test:mcp
 
       - name: Validate dev MCP endpoint
-        if: ${{ needs.classify-pr.outputs.mcp == 'true' }}
+        if: ${{ needs.classify-pr.outputs.mcp == 'true' && github.event_name != 'pull_request' }}
         run: pnpm validate:mcp-endpoint -- --url https://heyclaude-dev.zeronode.workers.dev/api/mcp
 
       - name: Dry-run MCP package tarball
@@ -529,7 +665,7 @@ jobs:
       - name: Validate packed MCP package
         if: ${{ needs.classify-pr.outputs.mcp == 'true' }}
         env:
-          MCP_PACKAGE_REMOTE_SMOKE_URL: https://heyclaude-dev.zeronode.workers.dev/api/mcp
+          MCP_PACKAGE_REMOTE_SMOKE_URL: ${{ github.event_name != 'pull_request' && 'https://heyclaude-dev.zeronode.workers.dev/api/mcp' || '' }}
         run: pnpm validate:mcp-package
 
   validate-raycast:
@@ -658,24 +794,23 @@ jobs:
         if: ${{ needs.classify-pr.outputs.packages == 'true' }}
         run: pnpm scan:packages
 
-  validate-pr-preview:
-    name: validate-pr-preview
-    if: ${{ github.event_name == 'pull_request' && (needs.classify-pr.outputs.web == 'true' || needs.classify-pr.outputs.registry == 'true' || needs.classify-pr.outputs.mcp == 'true') }}
+  validate-submission-gate:
+    name: validate-submission-gate
     needs: classify-pr
+    if: ${{ needs.classify-pr.outputs.submission_gate == 'true' }}
     runs-on: ubuntu-latest
-    env:
-      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      CLOUDFLARE_DEV_WORKER_URL: ${{ vars.CLOUDFLARE_DEV_WORKER_URL || 'https://heyclaude-dev.zeronode.workers.dev' }}
+    permissions:
+      contents: read
     concurrency:
-      group: deployment-artifacts-pr-preview-${{ github.repository }}
-      cancel-in-progress: false
+      group: pr-validate-submission-gate-${{ github.ref }}
+      cancel-in-progress: true
 
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup pnpm
         uses: pnpm/action-setup@4f4305e1fe60ad818b8ae6fc4a697cc47eab0b2d
@@ -689,29 +824,82 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Deploy same-repo PR preview to dev Worker
-        id: deploy-preview
-        if: ${{ github.event.pull_request.head.repo.full_name == github.repository && env.CLOUDFLARE_API_TOKEN != '' }}
-        run: |
-          pnpm --filter web run deploy:dev
-          echo "base-url=$CLOUDFLARE_DEV_WORKER_URL" >> "$GITHUB_OUTPUT"
+      - name: Test private submission gate helpers
+        run: pnpm exec vitest run tests/submission-gate-worker.test.ts
+
+      - name: Dry-run submission gate Worker and Container
+        run: pnpm submission-gate:dry-run
+
+  validate-pr-preview:
+    name: validate-pr-preview
+    if: ${{ github.event_name == 'pull_request' && (needs.classify-pr.outputs.web == 'true' || needs.classify-pr.outputs.registry == 'true' || needs.classify-pr.outputs.mcp == 'true') }}
+    needs: classify-pr
+    runs-on: ubuntu-latest
+    env:
+      REQUIRE_PR_PREVIEW: ${{ github.event.pull_request.head.repo.full_name == github.repository && 'true' || 'false' }}
+    concurrency:
+      group: deployment-artifacts-pr-preview-${{ github.repository }}
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@4f4305e1fe60ad818b8ae6fc4a697cc47eab0b2d
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f
+        with:
+          node-version: 24.16.0
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Resolve PR preview URL
         id: preview-url
         env:
+          ALLOW_SHARED_DEV_WORKER_PREVIEW: ${{ github.event.pull_request.head.repo.full_name == github.repository && '1' || '0' }}
+          CLOUDFLARE_DEV_WORKER_URL: https://heyclaude-dev.zeronode.workers.dev
           GITHUB_TOKEN: ${{ github.token }}
-          PREVIEW_DEPLOYMENT_URL: ${{ steps.deploy-preview.outputs.base-url }}
-        run: node scripts/resolve-pr-preview-url.mjs --allow-missing
+        run: |
+          args=(--wait-seconds 600 --poll-seconds 15)
+          if [ "$REQUIRE_PR_PREVIEW" != "true" ]; then
+            args=(--allow-missing --wait-seconds 0)
+          fi
+          node scripts/resolve-pr-preview-url.mjs "${args[@]}"
 
       - name: Validate deployed artifact contract
         if: ${{ steps.preview-url.outputs.base-url != '' }}
-        run: pnpm validate:deployment-artifacts -- --base-url "${{ steps.preview-url.outputs.base-url }}"
+        run: |
+          deadline=$((SECONDS + 600))
+          until pnpm validate:deployment-artifacts -- --base-url "${{ steps.preview-url.outputs.base-url }}"; do
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::Deployed preview did not satisfy the artifact contract before timeout."
+              exit 1
+            fi
+            echo "Preview artifact contract not ready yet. Waiting 15s..."
+            sleep 15
+          done
 
       - name: Validate deployed MCP endpoint contract
         if: ${{ steps.preview-url.outputs.base-url != '' }}
         env:
           MCP_ENDPOINT_URL: ${{ steps.preview-url.outputs.base-url }}/api/mcp
-        run: pnpm validate:mcp-endpoint
+        run: |
+          deadline=$((SECONDS + 600))
+          until pnpm validate:mcp-endpoint; do
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::Deployed preview MCP endpoint did not satisfy the endpoint contract before timeout."
+              exit 1
+            fi
+            echo "Preview MCP endpoint contract not ready yet. Waiting 15s..."
+            sleep 15
+          done
 
   required-pr-gate:
     name: required-pr-gate
@@ -721,11 +909,13 @@ jobs:
       - validate-ci
       - validate-content
       - validate-content-policy
+      - validate-submission-source
       - validate-registry
       - validate-web
       - validate-mcp
       - validate-raycast
       - validate-packages
+      - validate-submission-gate
       - validate-pr-preview
     if: ${{ always() }}
     runs-on: ubuntu-latest

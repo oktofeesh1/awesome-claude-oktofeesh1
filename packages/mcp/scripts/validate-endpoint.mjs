@@ -50,6 +50,29 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+function assertSubmitUrl(value) {
+  let url;
+  try {
+    url = new URL(String(value || ""));
+  } catch {
+    throw new Error(
+      "build_submission_urls did not return an absolute submit URL.",
+    );
+  }
+  assert(
+    url.protocol === "https:",
+    "build_submission_urls submit URL must use HTTPS.",
+  );
+  assert(
+    url.origin === "https://heyclau.de",
+    "build_submission_urls submit URL used the wrong origin.",
+  );
+  assert(
+    url.pathname === "/submit",
+    "build_submission_urls did not return the submit URL.",
+  );
+}
+
 function assertSafetyMetadataShape(payload, label) {
   assert(
     Array.isArray(payload?.safetyNotes),
@@ -295,8 +318,8 @@ async function validateMcpTools(endpointUrl, options = {}) {
     );
     assert(schema.ok === true, "get_submission_schema did not return ok.");
     assert(
-      schema.issueTemplate?.template === "submit-mcp.yml",
-      "get_submission_schema did not return the MCP issue template.",
+      schema.prIntake?.mode === "github_app_user_fork_pr",
+      "get_submission_schema did not return PR-first intake metadata.",
     );
     if (options.requireSafetyMetadata) {
       const fieldIds = schema.schema?.fields?.map((field) => field.id) || [];
@@ -327,10 +350,7 @@ async function validateMcpTools(endpointUrl, options = {}) {
       }),
     );
     assert(urls.ok === true, "build_submission_urls did not return ok.");
-    assert(
-      String(urls.githubIssueUrl || "").includes("template=submit-mcp.yml"),
-      "build_submission_urls did not return an MCP issue URL.",
-    );
+    assertSubmitUrl(urls.submitUrl);
 
     if (toolNames.includes("prepare_submission_draft")) {
       const prepared = parseToolResult(
@@ -350,11 +370,13 @@ async function validateMcpTools(endpointUrl, options = {}) {
         }),
       );
       assert(
-        prepared.issueDraft?.body,
-        "prepare_submission_draft did not return a canonical issue body.",
+        prepared.prDraft?.body,
+        "prepare_submission_draft did not return a canonical PR draft body.",
       );
       assert(
-        String(prepared.submissionPolicy || "").includes("does not auto-merge"),
+        String(prepared.submissionPolicy || "").includes(
+          "may be merged automatically",
+        ),
         "prepare_submission_draft did not expose the maintainer-reviewed policy.",
       );
     }

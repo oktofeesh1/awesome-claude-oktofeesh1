@@ -43,7 +43,11 @@ function createFixtureRepo() {
   };
 }
 
-function runClassifier(cwd: string, baseSha: string) {
+function runClassifier(
+  cwd: string,
+  baseSha: string,
+  extraEnv: Record<string, string> = {},
+) {
   const outputPath = path.join(cwd, "github-output.txt");
   execFileSync(
     "node",
@@ -52,6 +56,9 @@ function runClassifier(cwd: string, baseSha: string) {
       cwd,
       env: {
         ...process.env,
+        GITHUB_HEAD_REF: "contributor/source-entry",
+        HEAD_REF: "contributor/source-entry",
+        ...extraEnv,
         BASE_SHA: baseSha,
         GITHUB_EVENT_NAME: "pull_request",
         GITHUB_OUTPUT: outputPath,
@@ -70,7 +77,7 @@ describe("PR change classifier", () => {
     }
   });
 
-  it("routes content entry changes through public artifact validation lanes", () => {
+  it("routes direct content entry PRs through the focused submission lane", () => {
     const { cwd, baseSha } = createFixtureRepo();
 
     const contentDir = path.join(cwd, "content", "agents");
@@ -86,6 +93,36 @@ describe("PR change classifier", () => {
     expect(outputs).toMatchObject({
       content: "true",
       content_agents: "true",
+      direct_submission: "true",
+      source_content_only: "true",
+      maintainer_import: "false",
+      registry: "false",
+      raycast: "false",
+      web: "false",
+    });
+  });
+
+  it("routes maintainer content imports through artifact validation lanes without generated files", () => {
+    const { cwd, baseSha } = createFixtureRepo();
+
+    const contentDir = path.join(cwd, "content", "agents");
+    fs.mkdirSync(contentDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(contentDir, "example.mdx"),
+      "---\ntitle: Example\n---\n",
+    );
+    git(cwd, ["add", "content/agents/example.mdx"]);
+    git(cwd, ["commit", "-m", "import content entry"]);
+
+    const outputs = runClassifier(cwd, baseSha, {
+      GITHUB_HEAD_REF: "automation/submission-pr-624-example",
+    });
+    expect(outputs).toMatchObject({
+      content: "true",
+      content_agents: "true",
+      direct_submission: "false",
+      maintainer_import: "true",
+      source_content_only: "true",
       registry: "true",
       raycast: "true",
       web: "true",
@@ -109,6 +146,23 @@ describe("PR change classifier", () => {
       content: "false",
       registry: "true",
       web: "true",
+    });
+  });
+
+  it("routes private submission gate changes through the gate lane", () => {
+    const { cwd, baseSha } = createFixtureRepo();
+    const gateDir = path.join(cwd, "apps", "submission-gate", "src");
+    fs.mkdirSync(gateDir, { recursive: true });
+    fs.writeFileSync(path.join(gateDir, "index.ts"), "export default {};\n");
+    git(cwd, ["add", "apps/submission-gate/src/index.ts"]);
+    git(cwd, ["commit", "-m", "update submission gate"]);
+
+    const outputs = runClassifier(cwd, baseSha);
+    expect(outputs).toMatchObject({
+      submission_gate: "true",
+      content: "false",
+      registry: "false",
+      web: "false",
     });
   });
 });

@@ -55,21 +55,21 @@ strict request validation, a 64 KiB body limit, and a dedicated Cloudflare
   rule adapters for skill packages.
 - `list_distribution_feeds` - discover public JSON, RSS, Atom, and platform
   feeds.
-- `get_submission_schema` - fetch category submission fields and issue template
-  metadata.
+- `get_submission_schema` - fetch category submission fields for PR-first
+  intake.
 - `validate_submission_draft` - validate a content submission draft locally.
 - `search_duplicate_entries` - check generated registry artifacts for likely
   duplicates before opening a submission.
-- `build_submission_urls` - build prefilled HeyClaude submit and GitHub issue
-  URLs for human review.
+- `build_submission_urls` - build prefilled HeyClaude submit and review URLs for human
+  review.
 - `get_category_submission_guidance` - fetch category-specific contribution
   guidance and required fields.
 - `prepare_submission_draft` - normalize and validate fields, then return a
-  canonical issue title/body plus prefilled URLs.
+  canonical PR draft plus prefilled submit URL.
 - `get_submission_examples` - fetch category-specific example fields and
   templates for more complete submissions.
 - `review_submission_draft` - review schema errors, duplicate risk, and
-  maintainer checklist items before a submission issue is opened.
+  maintainer checklist items before a submission PR is opened.
 - `get_submission_policy` - fetch the read-only submission, artifact, import,
   and maintainer-review policy.
 - `explain_entry_trust` - explain source, package, safety, privacy, and review
@@ -92,7 +92,7 @@ Workflow prompts are available for common client flows:
 
 - `find_best_asset`
 - `prepare_submission`
-- `review_submission_before_issue`
+- `review_submission_before_pr`
 - `install_asset_safely`
 
 ## Local Stdio
@@ -177,11 +177,12 @@ checks the HTTP guards used by the remote route.
 - Remote endpoint requires JSON POST bodies, rejects payloads above 64 KiB, and
   uses the dedicated `API_MCP_RATE_LIMIT` Cloudflare binding at
   60 requests/minute/IP in production.
-- Submission tools prepare review drafts only; HeyClaude does not auto-merge or
-  publish MCP-submitted content.
-- Source-backed, non-artifact submissions may be approved for a review PR after
-  repository gates pass, but the MCP server does not perform that action and
-  maintainers still review before merge.
+- Submission tools prepare review drafts only; the MCP server does not perform
+  GitHub writes or publish submitted content.
+- Source-backed, content-only PRs may be merged automatically after content
+  validation, Superagent, and private maintainer-agent review pass. Platform,
+  workflow, package, and generated-artifact changes are never auto-merged by
+  this path.
 - Community ZIP/MCPB artifacts are review/quarantine material only. Public
   HeyClaude-hosted downloads are maintainer-built package artifacts.
 

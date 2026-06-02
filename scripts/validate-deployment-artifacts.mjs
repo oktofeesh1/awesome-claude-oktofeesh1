@@ -38,6 +38,15 @@ function normalizeBaseUrl(value) {
   return trimmed.replace(/\/+$/, "");
 }
 
+function isCanonicalSubmitUrl(value) {
+  try {
+    const url = new URL(String(value || ""));
+    return url.origin === canonicalOrigin && url.pathname === "/submit";
+  } catch {
+    return false;
+  }
+}
+
 async function fetchJson(baseUrl, pathname) {
   const response = await fetch(`${baseUrl}${pathname}`, {
     headers: { accept: "application/json" },
@@ -194,13 +203,18 @@ try {
     fail("/data/submission-spec.json must expose category submission schemas");
   }
   if (
-    !submissionSpec?.issueTemplates?.skills?.labels?.includes(
-      "content-submission",
-    )
+    submissionSpec?.issueTemplates &&
+    typeof submissionSpec.issueTemplates === "object"
   ) {
-    fail(
-      "/data/submission-spec.json must expose generated issue template labels",
-    );
+    for (const [category, templateSpec] of Object.entries(
+      submissionSpec.issueTemplates,
+    )) {
+      if (templateSpec?.template) {
+        fail(
+          `/data/submission-spec.json must not expose public content issue templates (${category})`,
+        );
+      }
+    }
   }
 } catch (error) {
   fail(error instanceof Error ? error.message : String(error));
@@ -276,11 +290,9 @@ try {
   );
   if (
     submissionResult?.ok !== true ||
-    !String(submissionResult.githubIssueUrl || "").includes(
-      "template=submit-mcp.yml",
-    )
+    !isCanonicalSubmitUrl(submissionResult.submitUrl)
   ) {
-    fail("/api/mcp build_submission_urls tool did not return issue URLs");
+    fail("/api/mcp build_submission_urls tool did not return submit URL");
   }
 } catch (error) {
   fail(error instanceof Error ? error.message : String(error));

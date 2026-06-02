@@ -32,9 +32,7 @@ const apiRoutes = [
   "/api/newsletter/subscribe",
   "/api/newsletter/webhook",
   "/api/og",
-  "/api/submissions",
   "/api/submissions/preflight",
-  "/api/submissions/queue",
   "/api/download",
   "/api/jobs",
   "/api/jobs/{slug}",
@@ -140,7 +138,7 @@ describe("OpenAPI route coverage", () => {
       ]),
     });
     expect(
-      ENDPOINTS.find((endpoint) => endpoint.id === "submissions-create"),
+      ENDPOINTS.find((endpoint) => endpoint.id === "submissions-preflight"),
     ).toMatchObject({
       liveRequest: false,
     });

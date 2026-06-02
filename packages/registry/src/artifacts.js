@@ -182,6 +182,10 @@ export function buildRaycastDetailMarkdown(entry) {
 export function generatedAtForEntries(entries) {
   const latestDate = entries
     .map((entry) => String(entry.dateAdded || "").slice(0, 10))
+    .concat(
+      entries.map((entry) => String(entry.contentUpdatedAt || "").slice(0, 10)),
+    )
+    .concat(entries.map((entry) => String(entry.verifiedAt || "").slice(0, 10)))
     .filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value))
     .sort()
     .at(-1);
@@ -354,6 +358,7 @@ function sourceUrlsForEntry(entry) {
     entry.repoUrl,
     entry.githubUrl,
     entry.websiteUrl,
+    ...(Array.isArray(entry.retrievalSources) ? entry.retrievalSources : []),
   ]
     .map((value) => String(value || "").trim())
     .filter(Boolean)
@@ -1202,7 +1207,7 @@ export function buildRegistryArtifactSet(entries, params = {}) {
     {
       path: "submission-spec.json",
       type: "json",
-      value: buildSubmissionSpecs(),
+      value: buildSubmissionSpecs({ siteUrl }),
     },
     {
       path: "content-quality-report.json",
