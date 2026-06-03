@@ -1,0 +1,270 @@
+---
+title: Langfuse MCP Server for Claude
+slug: langfuse-mcp-server
+category: mcp
+description: >-
+  Official Langfuse MCP server for connecting Claude and other MCP clients to
+  project-scoped LLM observability, prompts, traces, observations, metrics,
+  scores, datasets, comments, and annotation queues.
+cardDescription: >-
+  Official Langfuse MCP server for project-scoped LLM observability, prompt
+  management, traces, metrics, scores, datasets, and comments.
+seoTitle: Langfuse MCP Server for Claude
+seoDescription: >-
+  Connect Claude to the official Langfuse MCP server for project-scoped LLM
+  observability, including traces, observations, metrics, scores, prompts,
+  datasets, comments, and annotation queues.
+author: Langfuse
+authorProfileUrl: "https://github.com/langfuse"
+submittedBy: oktofeesh1
+submittedByUrl: "https://github.com/oktofeesh1"
+dateAdded: "2026-06-03"
+documentationUrl: "https://langfuse.com/docs/api-and-data-platform/features/mcp-server"
+repoUrl: "https://github.com/langfuse/langfuse"
+installable: true
+installCommand: "claude mcp add --transport http langfuse https://cloud.langfuse.com/api/public/mcp --header \"Authorization: Basic {your-base64-token}\""
+usageSnippet: "claude mcp add --transport http langfuse https://cloud.langfuse.com/api/public/mcp --header \"Authorization: Basic {your-base64-token}\""
+copySnippet: |-
+  {
+    "langfuse": {
+      "url": "https://cloud.langfuse.com/api/public/mcp",
+      "headers": {
+        "Authorization": "Basic {your-base64-token}"
+      }
+    }
+  }
+configSnippet: |-
+  {
+    "langfuse": {
+      "url": "https://cloud.langfuse.com/api/public/mcp",
+      "headers": {
+        "Authorization": "Basic {your-base64-token}"
+      }
+    }
+  }
+estimatedSetupTime: 10 minutes
+difficulty: intermediate
+prerequisites:
+  - Langfuse Cloud, self-hosted Langfuse, or local development instance
+  - Project-scoped Langfuse public key and secret key
+  - Base64-encoded Basic Auth header for `public_key:secret_key`
+  - Claude Code, Cursor, Claude Desktop, or another HTTP-capable MCP client
+  - >-
+    A clear allowlist or review process if the client should only use read-only
+    observability tools
+safetyNotes:
+  - >-
+    The authenticated Langfuse MCP server exposes read and write tools by
+    default, including operations for prompts, scores, datasets, comments,
+    annotation queues, and models.
+  - >-
+    If you only want observability lookups, configure the MCP client with a tool
+    allowlist or other policy controls so write-capable tools are not available
+    to the agent.
+  - >-
+    Treat prompt updates, score creation, dataset changes, and annotation queue
+    edits as production-impacting actions when the connected Langfuse project is
+    used by real applications.
+  - >-
+    Use the regional or self-hosted endpoint that matches your data-residency
+    and compliance requirements.
+privacyNotes:
+  - >-
+    Langfuse project data can include prompts, traces, observations, model
+    inputs and outputs, metadata, scores, comments, datasets, media references,
+    and evaluation artifacts.
+  - >-
+    The Basic Auth header contains credentials derived from the Langfuse public
+    and secret keys; base64 encoding is transport formatting, not encryption.
+  - >-
+    Any data returned by MCP tools may be added to the model context of the
+    connected client, so avoid broad queries against production traces unless
+    the session is approved for that data.
+  - >-
+    Prefer scoped project keys, least-privilege MCP client settings, and
+    environment-specific endpoints for staging, production, HIPAA, or
+    self-hosted deployments.
+tags:
+  - langfuse
+  - observability
+  - traces
+  - metrics
+  - prompts
+  - evaluations
+  - mcp
+keywords:
+  - langfuse mcp
+  - llm observability mcp
+  - claude traces metrics
+  - langfuse prompt management
+  - model context protocol observability
+robotsIndex: true
+robotsFollow: true
+---
+
+## Content
+
+Langfuse MCP connects Claude and other MCP clients to the authenticated
+Langfuse data platform. It is project-scoped and works over HTTP, so agents can
+inspect and act on LLM observability data without installing a local MCP server.
+
+The entry is focused on the authenticated Langfuse Cloud and self-hosted MCP
+server, not the separate public documentation MCP server. The authenticated
+server is the right fit when an agent needs project data such as traces,
+observations, prompts, scores, datasets, comments, annotation queues, models,
+and metrics.
+
+Langfuse documents the MCP server as self-describing: clients should inspect
+the available tools and schemas dynamically because the hosted tool surface can
+evolve. For coding agents that can run local CLI tools, Langfuse also documents
+Agent Skill and CLI workflows; the hosted MCP server is strongest for MCP
+clients that need direct remote access to Langfuse project data.
+
+## Features
+
+- Hosted HTTP MCP server for Langfuse Cloud, regional Cloud deployments,
+  HIPAA US, self-hosted instances, and local development.
+- Project-scoped Basic Auth using a Langfuse public key and secret key.
+- Prompt management tools for listing prompts, reading prompt versions, and
+  creating or relabeling prompt versions.
+- Observation tools for reviewing traces, generations, spans, events, agent
+  steps, tool calls, fields, filter schemas, and filter values.
+- Metrics tools for querying metrics and inspecting the metrics schema.
+- Score and score-config tools for reading and creating evaluation scores.
+- Dataset and dataset-run tools for regression testing and evaluation
+  workflows.
+- Comment and annotation queue tools for review, labeling, and team workflows.
+- Media and health tools for retrieving media references and checking server
+  availability.
+
+## Use Cases
+
+- Ask Claude to inspect recent failed or high-latency traces before debugging an
+  agent regression.
+- Retrieve production prompt versions and labels before proposing a prompt
+  migration or rollback.
+- Query metrics and compare score trends while planning evaluation coverage.
+- Pull observation details, comments, and dataset context into an incident
+  timeline.
+- Create review notes or dataset items after a human approves the intended
+  write action.
+- Connect self-hosted Langfuse data to an MCP client without exposing unrelated
+  observability systems.
+
+## Installation
+
+### Claude Code
+
+1. Create or copy a project-scoped Langfuse public key and secret key.
+2. Encode the credentials as `public_key:secret_key`.
+
+```bash
+echo -n "pk-lf-your-public-key:sk-lf-your-secret-key" | base64
+```
+
+3. Add the Langfuse MCP server. Replace `{your-base64-token}` with the encoded
+   value.
+
+```bash
+claude mcp add --transport http langfuse https://cloud.langfuse.com/api/public/mcp \
+  --header "Authorization: Basic {your-base64-token}"
+```
+
+4. Verify the connection by asking Claude to list prompts or inspect the
+   available Langfuse MCP tools.
+
+### Other Regions and Deployments
+
+Use the endpoint that matches your deployment.
+
+```text
+https://cloud.langfuse.com/api/public/mcp
+https://us.cloud.langfuse.com/api/public/mcp
+https://jp.cloud.langfuse.com/api/public/mcp
+https://hipaa.cloud.langfuse.com/api/public/mcp
+https://your-domain.com/api/public/mcp
+```
+
+## Configuration
+
+```json
+{
+  "langfuse": {
+    "url": "https://cloud.langfuse.com/api/public/mcp",
+    "headers": {
+      "Authorization": "Basic {your-base64-token}"
+    }
+  }
+}
+```
+
+## Examples
+
+### Inspect recent observations
+
+Ask Claude to find relevant observations for a production incident, keeping the
+query bounded to the affected trace, environment, or time window.
+
+```text
+"Use Langfuse to list observations for the failed checkout trace from the last hour. Summarize names, levels, latency, and any error fields."
+```
+
+### Review prompt versions before changing labels
+
+Have Claude read prompt metadata before proposing a label move.
+
+```text
+"List the current production and staging versions of the support-agent prompt. Do not update labels yet; prepare a change plan first."
+```
+
+### Query metrics for an incident timeline
+
+Use the metrics tools to compare latency, cost, or quality trends.
+
+```text
+"Query Langfuse metrics for the support-agent environment during the deployment window and compare them to the previous two hours."
+```
+
+### Prepare dataset items for regression testing
+
+Use read operations first, then require explicit confirmation before creating
+dataset items.
+
+```text
+"Find three representative failed observations and draft dataset item payloads. Wait for approval before creating anything in Langfuse."
+```
+
+## Security
+
+- Use project-scoped keys and rotate them if they are copied into the wrong
+  MCP client, chat transcript, or environment.
+- Treat Basic Auth values as secrets. Base64 encoding only formats the
+  credential pair for HTTP transport.
+- Restrict write tools when the agent should only inspect traces, metrics, or
+  prompts.
+- Separate staging and production Langfuse projects when experimenting with MCP
+  workflows.
+- Review all proposed writes to prompts, labels, scores, datasets, comments,
+  models, and annotation queues before allowing the agent to execute them.
+
+## Troubleshooting
+
+### Claude cannot connect to Langfuse MCP
+
+Confirm the endpoint matches your Langfuse deployment and that the client is
+using HTTP transport with the `Authorization: Basic ...` header.
+
+### Authentication fails
+
+Regenerate the base64 token from the exact `public_key:secret_key` pair. Do not
+include extra whitespace or shell history placeholders in the encoded value.
+
+### The agent can see too many write tools
+
+Configure the MCP client with an allowlist for read-only tools or disable the
+server in sessions that should not mutate Langfuse data.
+
+### Queries return too much trace data
+
+Narrow requests by trace ID, observation ID, environment, field projection, or
+time window before asking the model to summarize results.
