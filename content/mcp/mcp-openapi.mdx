@@ -1,0 +1,343 @@
+---
+title: mcp-openapi for Claude
+slug: mcp-openapi
+category: mcp
+description: >-
+  Turn OpenAPI and Swagger specs into Claude MCP tools for API exploration,
+  endpoint discovery, and contract-aware tool calls.
+cardDescription: >-
+  Local OpenAPI-to-MCP server that parses specs, generates endpoint tools, and
+  lets Claude inspect operation schemas before calling APIs.
+seoTitle: mcp-openapi OpenAPI MCP Server for Claude
+seoDescription: >-
+  Use mcp-openapi with Claude to explore OpenAPI or Swagger specs, inspect API
+  operation schemas, scope generated tools, configure auth, and call REST APIs
+  through MCP with clear safety and privacy boundaries.
+author: Docat0209
+authorProfileUrl: "https://github.com/Docat0209"
+submittedBy: oktofeesh1
+submittedByUrl: "https://github.com/oktofeesh1"
+dateAdded: "2026-06-03"
+documentationUrl: "https://github.com/Docat0209/mcp-openapi#readme"
+repoUrl: "https://github.com/Docat0209/mcp-openapi"
+installable: true
+installCommand: >-
+  claude mcp add petstore-openapi -- npx -y mcp-openapi --spec
+  https://petstore3.swagger.io/api/v3/openapi.json --dynamic-discovery
+usageSnippet: >-
+  claude mcp add petstore-openapi -- npx -y mcp-openapi --spec
+  https://petstore3.swagger.io/api/v3/openapi.json --dynamic-discovery
+copySnippet: |-
+  {
+    "petstore-openapi": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-openapi",
+        "--spec",
+        "https://petstore3.swagger.io/api/v3/openapi.json",
+        "--dynamic-discovery"
+      ]
+    }
+  }
+configSnippet: |-
+  {
+    "mcpServers": {
+      "petstore-openapi": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "mcp-openapi",
+          "--spec",
+          "https://petstore3.swagger.io/api/v3/openapi.json",
+          "--dynamic-discovery"
+        ]
+      }
+    }
+  }
+estimatedSetupTime: 10 minutes
+difficulty: intermediate
+prerequisites:
+  - Node.js 18 or later
+  - Claude Code, Claude Desktop, Cursor, or another MCP-capable client with stdio support
+  - OpenAPI 3.x or Swagger 2.0 specification as a remote URL or local JSON/YAML file
+  - Clear decision about which API server from the spec should be used, such as staging instead of production
+  - API credentials when the selected API requires Bearer token, API-key, or OAuth2 client-credentials auth
+  - Agreement on which operations Claude is allowed to call before exposing write, delete, admin, billing, or user-data endpoints
+safetyNotes:
+  - >-
+    `mcp-openapi` turns API operations into callable MCP tools. If the spec
+    includes write, delete, admin, billing, or production operations, Claude can
+    attempt those calls unless you limit the exposed operations.
+  - >-
+    Use `--include` and `--exclude` to scope the tool surface to approved
+    operationIds or path patterns, especially before adding credentials.
+  - >-
+    Use `--server` or `--base-url` deliberately. Prefer staging, sandbox, or
+    read-only API servers until the generated tools are reviewed.
+  - >-
+    Review generated tool names, descriptions, and parameter schemas before
+    using them against important systems. Sparse or misleading OpenAPI
+    descriptions can reduce tool-calling accuracy.
+  - >-
+    Treat remote OpenAPI specs as untrusted input. The spec controls tool names,
+    descriptions, parameter schemas, server URLs, and endpoint shape shown to
+    the model.
+  - >-
+    The server retries 429 and 5xx responses by default. Lower `--max-retries`
+    or narrow the operation set for APIs where repeated calls are expensive,
+    rate-limited, or side-effectful.
+privacyNotes:
+  - >-
+    The project privacy policy says the server runs locally, does not collect
+    data, and does not include analytics or telemetry.
+  - >-
+    Network requests go to the configured OpenAPI spec URL and to the API
+    endpoints Claude invokes through generated tools.
+  - >-
+    API requests, response bodies, status codes, headers, and generated schema
+    details can be returned to the MCP client and model session.
+  - >-
+    Keep API keys, Bearer tokens, OAuth client secrets, and license keys in MCP
+    environment variables or local config, not in prompts, transcripts, checked
+    in examples, or shared screenshots.
+  - >-
+    Fetching a remote spec can disclose your client network metadata to the spec
+    host. Use a local spec file when exploring private or pre-release APIs.
+tags:
+  - openapi
+  - swagger
+  - api-tools
+  - rest-api
+  - schema
+  - mcp
+keywords:
+  - mcp-openapi
+  - openapi mcp
+  - swagger mcp
+  - openapi to mcp
+  - api contract mcp
+  - rest api mcp
+robotsIndex: true
+robotsFollow: true
+---
+
+## Content
+
+`mcp-openapi` is a local MCP server that turns an OpenAPI or Swagger
+specification into tools Claude can discover and call. Instead of pasting a
+large API contract into chat, point the server at a spec URL or local spec file
+and let it parse the operations, generate MCP tool schemas, and expose only the
+operations you choose.
+
+The server is useful for API exploration because it can search operations,
+browse by OpenAPI tags, and return full parameter schemas before an endpoint is
+called. It is also useful for contract-aware workflows because the generated
+tool names, parameters, request bodies, server selection, and auth behavior are
+derived from the OpenAPI or Swagger contract rather than handwritten prompts.
+
+By default, the generated tools can execute HTTP requests against the selected
+API server. That makes scoping important: use sandbox APIs while exploring,
+filter operations with `--include` or `--exclude`, and only add credentials
+after reviewing the generated tools.
+
+## Features
+
+- Converts OpenAPI 3.x and Swagger 2.0 specs into MCP tools.
+- Loads specs from remote URLs or local `.json`, `.yaml`, and `.yml` files.
+- Generates one MCP tool per API endpoint unless dynamic discovery is enabled.
+- Flattens path, query, header, and body parameters into LLM-friendly input
+  schemas.
+- Supports API-key, Bearer token, and OAuth2 client-credentials auth.
+- Supports `--include` and `--exclude` filters for limiting exposed operations.
+- Supports `--server` and `--base-url` for choosing the target API server.
+- Adds custom headers with repeatable `--header` flags.
+- Retries 429 and 5xx responses with exponential backoff.
+- Truncates large responses for model context.
+- Warns when generated tools have sparse endpoint documentation.
+- Auto-enables dynamic discovery for large APIs with 100 or more operations.
+
+## Dynamic Discovery Tools
+
+For large specs, `mcp-openapi` can avoid registering every endpoint directly.
+Instead it exposes three meta-tools:
+
+- `search_operations(query)` searches operation names, descriptions, and tags.
+- `list_by_tag(tag?)` lists tags or operations under a tag.
+- `get_tool_details(tool_name)` returns the full parameter schema for a
+  specific API tool before Claude calls it.
+
+This is the safest starting point for large public APIs because Claude can
+inspect the contract first instead of seeing hundreds of callable tools at
+once.
+
+## Installation
+
+### Claude Code
+
+Start with a public demo spec:
+
+```bash
+claude mcp add petstore-openapi -- npx -y mcp-openapi --spec https://petstore3.swagger.io/api/v3/openapi.json --dynamic-discovery
+```
+
+Then verify the server:
+
+```bash
+claude mcp list
+```
+
+Ask Claude to search operations first:
+
+```text
+Use petstore-openapi to search for pet lookup operations, then show the schema for the best matching operation before calling it.
+```
+
+### Claude Desktop
+
+Add the server to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "petstore-openapi": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-openapi",
+        "--spec",
+        "https://petstore3.swagger.io/api/v3/openapi.json",
+        "--dynamic-discovery"
+      ]
+    }
+  }
+}
+```
+
+Restart Claude Desktop and ask Claude to list API tags or search for an
+operation.
+
+## Authenticated API Example
+
+Use environment variables for credentials and limit the operation set:
+
+```json
+{
+  "mcpServers": {
+    "github-openapi": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-openapi",
+        "--spec",
+        "https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.json",
+        "--auth-type",
+        "bearer",
+        "--auth-token",
+        "$GITHUB_TOKEN",
+        "--prefix",
+        "github",
+        "--include",
+        "listReposForAuthenticatedUser,getRepo,listIssues",
+        "--dynamic-discovery"
+      ],
+      "env": {
+        "GITHUB_TOKEN": "<token with the minimum required scopes>"
+      }
+    }
+  }
+}
+```
+
+Do not expose broad write scopes until you have reviewed the generated tools and
+confirmed that the OpenAPI spec matches the API surface you intend Claude to
+use.
+
+## Common Options
+
+| Option | Purpose |
+| --- | --- |
+| `--spec <url-or-path>` | OpenAPI or Swagger spec to load. |
+| `--base-url <url>` | Override the API base URL from the spec. |
+| `--server <selector>` | Pick a server by index, partial URL, or exact URL. |
+| `--prefix <name>` | Prefix generated tool names, useful when multiple APIs are connected. |
+| `--include <patterns>` | Expose only matching operationIds or path patterns. |
+| `--exclude <patterns>` | Hide matching operationIds or path patterns. |
+| `--auth-type bearer` | Use a Bearer token from `--auth-token`. |
+| `--auth-type api-key` | Send an API key in a header or query parameter. |
+| `--auth-type oauth2` | Use OAuth2 client credentials. |
+| `--timeout <ms>` | Configure HTTP request timeout. |
+| `--max-retries <n>` | Configure retries for 429 and 5xx responses. |
+| `--dynamic-discovery` | Use meta-tools for searching and inspecting operations. |
+
+## Use Cases
+
+- Explore a new REST API without copying a large OpenAPI document into chat.
+- Let Claude inspect endpoint schemas before drafting integration code.
+- Compare staging and production server selections from the same spec.
+- Scope a few read-only API operations for support, reporting, or internal
+  tooling.
+- Build API contract review workflows where Claude checks request and response
+  shapes from the published spec.
+- Prototype MCP access to a private API before writing a custom hand-tuned MCP
+  server.
+
+## Contract Review Workflow
+
+1. Start with `--dynamic-discovery`.
+2. Ask Claude to call `search_operations` for the workflow area.
+3. Ask Claude to call `get_tool_details` for the candidate operation.
+4. Review required parameters, body schema, auth requirements, and endpoint
+   path.
+5. Only then ask Claude to call the operation against a sandbox or scoped API
+   server.
+
+This keeps the OpenAPI contract in the loop before live API calls happen.
+
+## Safety Checklist
+
+- Use a local spec file for private APIs when possible.
+- Prefer staging or sandbox `--server` selections for first runs.
+- Add `--include` for the small set of operations Claude actually needs.
+- Exclude destructive, billing, admin, and user-management operations by
+  default.
+- Use least-privilege API tokens and rotate them like other production
+  credentials.
+- Review output from `get_tool_details` before calling important operations.
+- Keep generated API responses out of shared transcripts when they contain
+  customer, employee, financial, health, or internal system data.
+
+## Troubleshooting
+
+### Spec fails to load
+
+Confirm the URL or local path is reachable from the machine running the MCP
+server. For private specs, use a local file or add the required headers.
+
+### Too many tools appear in Claude
+
+Enable `--dynamic-discovery` or narrow the tool surface with `--include`.
+
+### Claude calls the wrong server
+
+Use `--server` to select the right OpenAPI `servers[]` entry, or use
+`--base-url` to override the API base URL.
+
+### Authenticated calls fail
+
+Confirm the token or key is available in the MCP server environment and has the
+minimum scopes needed for the selected operation.
+
+### Responses are too large
+
+Narrow the operation, use server-side query parameters, or add a smaller result
+limit where the API supports it. The free server truncates large responses for
+model context.
+
+## Sources
+
+- [mcp-openapi source repository](https://github.com/Docat0209/mcp-openapi)
+- [mcp-openapi npm package](https://www.npmjs.com/package/mcp-openapi)
+- [mcp-openapi privacy policy](https://github.com/Docat0209/mcp-openapi/blob/main/PRIVACY.md)
+- [mcp-openapi security policy](https://github.com/Docat0209/mcp-openapi/blob/main/SECURITY.md)
+- [OpenAPI Specification](https://spec.openapis.org/oas/latest.html)
