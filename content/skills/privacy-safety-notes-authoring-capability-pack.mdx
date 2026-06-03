@@ -1,0 +1,201 @@
+---
+title: Privacy and Safety Notes Authoring Capability Pack Skill
+slug: privacy-safety-notes-authoring-capability-pack
+category: skills
+description: "Expert HeyClaude metadata skill for writing practical prerequisites, safetyNotes, privacyNotes, disclosure boundaries, and risk-review evidence."
+cardDescription: "Author useful safety and privacy notes for HeyClaude entries by mapping runtime, data, install, and disclosure risk to concise metadata."
+seoTitle: Privacy and Safety Notes Authoring Capability Pack Skill
+seoDescription: "Advanced AI skill for writing HeyClaude prerequisites, safetyNotes, privacyNotes, disclosure boundaries, and risk-review metadata."
+author: oktofeesh1
+authorProfileUrl: "https://github.com/oktofeesh1"
+dateAdded: "2026-06-03"
+submittedBy: oktofeesh1
+submittedByUrl: "https://github.com/oktofeesh1"
+submittedAt: "2026-06-03"
+submissionIssueNumber: 725
+submissionIssueUrl: "https://github.com/JSONbored/awesome-claude/issues/725"
+documentationUrl: "https://github.com/JSONbored/awesome-claude/blob/main/content/SCHEMA.md"
+downloadUrl: "https://github.com/JSONbored/awesome-claude/archive/163c28eebca7887577acd1eddc5058abf20de893.zip"
+installable: true
+installCommand: "git clone https://github.com/JSONbored/awesome-claude.git && cd awesome-claude && pnpm validate:content:strict"
+usageSnippet: "Use this skill when authoring or reviewing HeyClaude prerequisites, safetyNotes, privacyNotes, disclosure, or risk-review notes for a content entry."
+copySnippet: |-
+  # Trigger
+  "Apply the privacy and safety notes authoring capability pack to this HeyClaude content entry."
+
+  # Required output
+  1) Entry category, source evidence, and duplicate/adjacent-entry boundary
+  2) Runtime, install, permission, data, and commercial-disclosure risk inventory
+  3) Draft prerequisites, safetyNotes, privacyNotes, and disclosure recommendation
+  4) Validation checklist and merge, hold, or follow-up recommendation
+skillType: capability-pack
+skillLevel: expert
+verificationStatus: validated
+verifiedAt: "2026-06-03"
+retrievalSources:
+  - "https://github.com/JSONbored/awesome-claude/blob/main/content/SCHEMA.md"
+  - "https://raw.githubusercontent.com/JSONbored/awesome-claude/163c28eebca7887577acd1eddc5058abf20de893/content/SCHEMA.md"
+  - "https://raw.githubusercontent.com/JSONbored/awesome-claude/163c28eebca7887577acd1eddc5058abf20de893/packages/registry/src/submission-spec.js"
+  - "https://raw.githubusercontent.com/JSONbored/awesome-claude/163c28eebca7887577acd1eddc5058abf20de893/packages/registry/src/submission-risk.js"
+  - "https://raw.githubusercontent.com/JSONbored/awesome-claude/163c28eebca7887577acd1eddc5058abf20de893/scripts/ci/validate-content-policy.mjs"
+  - "https://raw.githubusercontent.com/JSONbored/awesome-claude/163c28eebca7887577acd1eddc5058abf20de893/packages/registry/src/quality.js"
+  - "https://raw.githubusercontent.com/JSONbored/awesome-claude/163c28eebca7887577acd1eddc5058abf20de893/packages/registry/src/content-schema.js"
+testedPlatforms:
+  - Claude
+  - Codex
+  - Windsurf
+  - Gemini
+  - Cursor
+  - Generic AGENTS
+prerequisites:
+  - "HeyClaude category, slug, source URLs, and intended user workflow for the reviewed entry"
+  - "Draft or existing prerequisites, safetyNotes, privacyNotes, and disclosure fields"
+  - "Install, execution, permission, data handling, package, and commercial-listing facts from source evidence"
+  - "Current content policy, submission-spec, registry schema, and quality-report behavior"
+  - "Reviewer decision on whether a note is public-safe, too vague, missing, or not applicable"
+safetyNotes:
+  - "This skill changes review text and metadata only; it does not run submitted code or grant permissions by itself."
+  - "Running the optional validation command checks the local content tree and package metadata; review staged changes before relying on results."
+  - "Risk wording can affect maintainer acceptance, search trust signals, and user expectations; do not soften material runtime or install risk."
+  - "The source archive is external and pinned to the reviewed upstream commit; package trust should remain a maintainer decision."
+privacyNotes:
+  - "Privacy-note drafting can surface local paths, logs, credentials, telemetry, third-party data handling, retained data, and user-data exposure from sources."
+  - "Keep public notes specific but not needlessly revealing; summarize sensitive examples without exposing private names, secret values, or unreleased details."
+  - "Disclosure is for commercial listing status, not runtime privacy behavior; keep paid, affiliate, sponsored, or claimed status separate from privacyNotes."
+tags:
+  - heyclaude
+  - safety-notes
+  - privacy-notes
+  - content-policy
+  - capability-pack
+keywords:
+  - HeyClaude safety notes
+  - HeyClaude privacy notes
+  - content policy metadata
+  - submission risk review
+  - privacy and safety authoring
+  - registry trust metadata
+readingTime: 8
+robotsIndex: true
+robotsFollow: true
+---
+
+## Knowledge Freshness
+
+This capability pack is pinned to HeyClaude `upstream/main` commit **163c28eebca7887577acd1eddc5058abf20de893**, content schema guidance, submission field help, content policy validation, submission risk review, and registry quality scoring verified on **2026-06-03**.
+
+## Retrieval Sources
+
+- https://github.com/JSONbored/awesome-claude/blob/main/content/SCHEMA.md
+- https://raw.githubusercontent.com/JSONbored/awesome-claude/163c28eebca7887577acd1eddc5058abf20de893/content/SCHEMA.md
+- https://raw.githubusercontent.com/JSONbored/awesome-claude/163c28eebca7887577acd1eddc5058abf20de893/packages/registry/src/submission-spec.js
+- https://raw.githubusercontent.com/JSONbored/awesome-claude/163c28eebca7887577acd1eddc5058abf20de893/packages/registry/src/submission-risk.js
+- https://raw.githubusercontent.com/JSONbored/awesome-claude/163c28eebca7887577acd1eddc5058abf20de893/scripts/ci/validate-content-policy.mjs
+- https://raw.githubusercontent.com/JSONbored/awesome-claude/163c28eebca7887577acd1eddc5058abf20de893/packages/registry/src/quality.js
+- https://raw.githubusercontent.com/JSONbored/awesome-claude/163c28eebca7887577acd1eddc5058abf20de893/packages/registry/src/content-schema.js
+
+Prefer the pinned schema and policy sources over model memory for field purpose, risk-bearing categories, required note behavior, direct-submission policy warnings, and quality-report scoring.
+
+## Scope Note
+
+This is not the HeyClaude Content Submission Factory, the HeyClaude Skill Submission Factory, or a generic compliance guide. Use it for the narrower job of writing and reviewing `prerequisites`, `safetyNotes`, `privacyNotes`, and `disclosure` fields so a single content entry explains real user risk without promotional filler or hidden assumptions.
+
+## Core Workflow
+
+1. Confirm category fit, source URLs, entry slug, and whether the submission is new content, an existing-entry improvement, or maintainer cleanup.
+2. Identify the actual user workflow: install, copy, run, connect, configure, review, publish, monitor, or use as reference material only.
+3. Separate fields by job. Put setup requirements in `prerequisites`, execution and permission risk in `safetyNotes`, data handling in `privacyNotes`, and commercial listing status in `disclosure`.
+4. Inventory runtime and install risk: commands, packages, generated artifacts, network calls, background behavior, public-write behavior, destructive operations, and owner-controlled settings.
+5. Inventory privacy risk: local paths, logs, credentials, telemetry, third-party services, retained data, user-provided content, and public artifact exposure.
+6. Draft notes as short, concrete statements. Name the behavior, state the user impact, and avoid vague warnings such as "review carefully" without the reason.
+7. Use "Not applicable: ..." only when source evidence supports that there is genuinely no relevant runtime, install, data, or disclosure behavior.
+8. Check risk-policy fit: confirm that medium or high-risk signals have matching notes, and that the notes do not introduce unsupported claims.
+9. Produce a recommendation with missing notes, overbroad notes, public-redaction needs, validation commands, and a merge, hold, or follow-up decision.
+
+## Capability Scope
+
+- HeyClaude note-field purpose review
+- `prerequisites` authoring
+- `safetyNotes` authoring
+- `privacyNotes` authoring
+- `disclosure` boundary review
+- Risk-bearing entry triage
+- Public-safe wording and redaction review
+- Validation and quality-report readiness
+
+## Compatibility
+
+### Native
+
+- **Claude Code / Claude**: use as a reusable Agent Skill for HeyClaude content metadata review.
+- **Codex/OpenAI workflows**: use as `SKILL.md`-style instructions for one-file content PR preparation and review.
+
+### Manual Adaptation
+
+- **Windsurf and Gemini**: adapt the workflow and output contract into their skill formats.
+- **Cursor and Generic AGENTS files**: convert the production rules and validation checklist into repository-level content policy guidance.
+
+## Required Inputs
+
+- HeyClaude category and content path
+- Current entry frontmatter or submission draft
+- Source URLs, docs, repo, package, or release evidence
+- Install and runtime behavior summary
+- Data handling and retention facts
+- Commercial listing status when relevant
+- Local validation or policy output when available
+
+## Production Rules
+
+- Do not use `disclosure` for runtime safety or privacy warnings.
+- Do not write generic notes that could apply to any tool; each note should name the specific behavior or exposure.
+- Do not claim "not applicable" until source evidence supports the absence of relevant runtime, install, or data behavior.
+- Treat package install, network access, account-write behavior, background behavior, destructive operations, credentials, telemetry, and user-data handling as note-worthy.
+- Keep public notes useful without exposing secrets, private URLs, customer names, unreleased features, or unnecessary implementation detail.
+- Keep safety and privacy separate. A command can be safe to run but still expose data, and a private data flow can still have low execution risk.
+- Prefer fewer high-signal notes over long lists that hide the real risk.
+- Re-run content validation after editing notes because field shape, arrays, and category rules still matter.
+
+## Output Contract
+
+1. Source evidence: files, docs, package metadata, or policy sources reviewed.
+2. Risk inventory: install, execution, permission, data, storage, telemetry, public artifact, and commercial-disclosure facts.
+3. Field mapping: prerequisites, safetyNotes, privacyNotes, disclosure, and any "not applicable" rationale.
+4. Draft notes: concise final wording suitable for frontmatter.
+5. Validation plan: content validation, audit, policy gate, and duplicate/adjacent-entry check.
+6. Recommendation: merge, hold, request changes, or accept with tracked follow-up.
+
+## Troubleshooting
+
+**Issue:** A note repeats the description instead of explaining risk
+
+**Fix:** Rewrite it to name the behavior, permission, data flow, or artifact that changes user risk.
+
+**Issue:** Safety and privacy notes are mixed together
+
+**Fix:** Move runtime, install, and permission concerns to `safetyNotes`; move data access, logs, telemetry, retention, and exposure concerns to `privacyNotes`.
+
+**Issue:** The entry has no risky behavior
+
+**Fix:** Use a short "Not applicable: ..." note only after confirming the entry is documentation-only or reference-only from the source evidence.
+
+**Issue:** Notes reveal too much sensitive context
+
+**Fix:** Preserve the risk class while redacting private names, exact paths, secret values, and unreleased details.
+
+**Issue:** Policy output flags missing notes after notes were added
+
+**Fix:** Confirm the fields are arrays in frontmatter, the category is correct, and the note text is not empty or placeholder-level.
+
+## Validation Checklist
+
+- Field purpose checked against `content/SCHEMA.md`.
+- Submission-spec help text reviewed.
+- Risk-policy note requirements reviewed.
+- Quality-report note coverage behavior reviewed.
+- Entry category and source evidence confirmed.
+- Runtime and install risks inventoried.
+- Data handling and telemetry facts inventoried.
+- `disclosure` kept separate from runtime and privacy notes.
+- Public-safe wording reviewed.
+- Merge, hold, request-changes, or follow-up recommendation documented.
