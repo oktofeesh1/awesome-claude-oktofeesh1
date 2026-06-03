@@ -1,0 +1,220 @@
+---
+title: Cloudflare Workers Deployment Capability Pack Skill
+slug: cloudflare-workers-deployment-capability-pack
+category: skills
+description: "Expert Cloudflare Workers deployment skill for Wrangler projects, environment separation, CI auth, versions, gradual rollout, observability, and rollback."
+cardDescription: "Deploy Cloudflare Workers with Wrangler, scoped secrets, environment checks, versioned rollout, and rollback-ready verification."
+seoTitle: Cloudflare Workers Deployment Capability Pack Skill
+seoDescription: "Advanced AI skill for Cloudflare Workers deployment using Wrangler, versions, gradual deployments, CI/CD auth, logs, and rollback controls."
+author: oktofeesh1
+authorProfileUrl: "https://github.com/oktofeesh1"
+dateAdded: "2026-06-03"
+submittedBy: oktofeesh1
+submittedByUrl: "https://github.com/oktofeesh1"
+submittedAt: "2026-06-03"
+submissionIssueNumber: 714
+submissionIssueUrl: "https://github.com/JSONbored/awesome-claude/issues/714"
+repoUrl: "https://github.com/cloudflare/workers-sdk"
+documentationUrl: "https://developers.cloudflare.com/workers/"
+downloadUrl: "https://github.com/cloudflare/workers-sdk/archive/refs/tags/wrangler@4.97.0.zip"
+installable: true
+installCommand: "npm install --save-dev wrangler@4.97.0 && npx wrangler --version"
+usageSnippet: "Use this skill when preparing, deploying, verifying, or rolling back Cloudflare Workers with Wrangler, environments, secrets, versions, and CI/CD."
+copySnippet: |-
+  # Trigger
+  "Apply the Cloudflare Workers deployment capability pack to this release."
+
+  # Required output
+  1) Account, Worker, environment, route, and binding inventory
+  2) Deployment command plan with dry-run or preview step
+  3) Secrets/API token handling checklist
+  4) Version, gradual rollout, verification, and rollback procedure
+skillType: capability-pack
+skillLevel: expert
+verificationStatus: validated
+verifiedAt: "2026-06-03"
+retrievalSources:
+  - "https://developers.cloudflare.com/workers/get-started/guide/"
+  - "https://developers.cloudflare.com/workers/wrangler/install-and-update/"
+  - "https://developers.cloudflare.com/workers/wrangler/commands/"
+  - "https://developers.cloudflare.com/workers/wrangler/commands/workers/"
+  - "https://developers.cloudflare.com/workers/wrangler/configuration/"
+  - "https://developers.cloudflare.com/workers/wrangler/environments/"
+  - "https://developers.cloudflare.com/workers/configuration/secrets/"
+  - "https://developers.cloudflare.com/workers/configuration/versions-and-deployments/"
+  - "https://developers.cloudflare.com/workers/configuration/versions-and-deployments/gradual-deployments/"
+  - "https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/"
+  - "https://developers.cloudflare.com/workers/observability/logs/workers-logs/"
+  - "https://www.npmjs.com/package/wrangler/v/4.97.0"
+testedPlatforms:
+  - Claude
+  - Codex
+  - Windsurf
+  - Gemini
+  - Cursor
+  - Generic AGENTS
+prerequisites:
+  - Cloudflare account with access to the target Worker account and zone
+  - Existing Worker project or planned Worker entrypoint with Wrangler configuration
+  - Local Node.js/npm toolchain and project-local Wrangler dependency
+  - Account ID, API token plan, and environment names for local and CI deployment
+  - Route, workers.dev, custom domain, trigger, and binding inventory
+safetyNotes:
+  - Deploying or rolling back a Worker changes live Cloudflare edge traffic; verify account, Worker name, environment, route, and domain before mutation.
+  - Version, trigger, and rollback commands mutate Cloudflare state; use preview, staging, dry-run, or gradual deployment for production-risk changes.
+  - The archive URL points to Cloudflare's external Workers SDK tag archive; pin versions and review release provenance before using it in CI.
+  - Use least-privilege API tokens and store them in Cloudflare or CI secret stores; never commit `.dev.vars`, `.env`, tokens, or account credentials.
+  - Worker versions do not track KV, R2, D1, Durable Object, or other storage state changes; validate data migrations and binding changes separately.
+privacyNotes:
+  - Wrangler deploy uploads bundled Worker source, static assets, and configuration metadata to Cloudflare.
+  - Workers Logs and Tail Workers can contain request URLs, headers, exception details, and application logs; redact sensitive fields and set retention intentionally.
+  - CI deploys rely on account IDs and API tokens; avoid printing environment dumps, secret values, or full request payloads in logs.
+  - Routes, custom domains, account IDs, and zone IDs can reveal infrastructure topology; treat release notes and logs as public unless proven otherwise.
+tags:
+  - cloudflare
+  - workers
+  - wrangler
+  - deployment
+  - cicd
+  - rollback
+keywords:
+  - cloudflare workers deployment
+  - wrangler deploy
+  - workers versions deploy
+  - gradual deployment
+  - workers rollback
+  - cloudflare ci cd
+readingTime: 9
+robotsIndex: true
+robotsFollow: true
+---
+
+## Knowledge Freshness
+
+This capability pack is pinned to Cloudflare Workers and Wrangler documentation verified on **2026-06-03**. Re-check the official docs before production use because Wrangler commands, rollout features, and environment behavior change over time.
+
+## Retrieval Sources
+
+- https://developers.cloudflare.com/workers/get-started/guide/
+- https://developers.cloudflare.com/workers/wrangler/install-and-update/
+- https://developers.cloudflare.com/workers/wrangler/commands/
+- https://developers.cloudflare.com/workers/wrangler/commands/workers/
+- https://developers.cloudflare.com/workers/wrangler/configuration/
+- https://developers.cloudflare.com/workers/wrangler/environments/
+- https://developers.cloudflare.com/workers/configuration/secrets/
+- https://developers.cloudflare.com/workers/configuration/versions-and-deployments/
+- https://developers.cloudflare.com/workers/configuration/versions-and-deployments/gradual-deployments/
+- https://developers.cloudflare.com/workers/ci-cd/external-cicd/github-actions/
+- https://developers.cloudflare.com/workers/observability/logs/workers-logs/
+- https://www.npmjs.com/package/wrangler/v/4.97.0
+
+Prefer direct retrieval from official Cloudflare docs, Wrangler command references, and the pinned package metadata over model memory for command flags, rollout constraints, and deployment behavior.
+
+## Core Workflow
+
+1. Identify the Cloudflare account, Worker name, deployment target, environment, and route or domain that will receive traffic.
+2. Read the current Wrangler configuration and list top-level and environment-specific bindings, vars, routes, triggers, observability, compatibility dates, and static asset settings.
+3. Confirm authentication mode. Use `wrangler login` for local work and scoped API token plus account ID secrets for non-interactive CI.
+4. Run local checks before mutation: dependency install, type checks, tests, `npx wrangler --version`, and `npx wrangler deploy --dry-run` where the project supports it.
+5. For low-risk changes, deploy with `npx wrangler deploy --env <environment>` and a descriptive message or tag when supported.
+6. For higher-risk changes, upload a version with `npx wrangler versions upload`, create a gradual deployment with `npx wrangler versions deploy`, and monitor error rate, logs, and health checks before promoting to 100%.
+7. Apply route, custom domain, or scheduled trigger changes deliberately; when using uploaded versions, run `npx wrangler triggers deploy` for trigger changes.
+8. Verify the deployed Worker with external smoke tests, Workers Logs, dashboard deployment status, `npx wrangler deployments list`, and application-specific checks.
+9. If the release fails, roll back with `npx wrangler rollback <version-id>` or deploy a known-good version, then document what storage or binding state was outside Worker version control.
+
+## Capability Scope
+
+- Wrangler project-local installation and command selection
+- `wrangler.jsonc` or `wrangler.toml` deployment configuration review
+- Environment-specific deploys with `--env` or `CLOUDFLARE_ENV`
+- API token, account ID, and CI secret handling
+- Versions, deployments, gradual rollout, and rollback planning
+- Trigger, route, custom domain, and time-based trigger deployment checks
+- Worker observability through Workers Logs, deployment status, and smoke tests
+- Storage and binding caveats for KV, R2, D1, Durable Objects, and service bindings
+
+## Compatibility
+
+### Native
+
+- **Claude Code / Claude**: use as a reusable Agent Skill workflow for deployment planning and execution review.
+- **Codex/OpenAI workflows**: use as `SKILL.md`-style operating instructions when changing Cloudflare Worker deploy paths.
+
+### Manual Adaptation
+
+- **Windsurf and Gemini**: adapt the trigger, workflow, and output contract into their native skill or command formats.
+- **Cursor and Generic AGENTS files**: convert the scope, production rules, and validation checklist into a repository rule for Worker deploy changes.
+
+## Required Inputs
+
+- Target account and Worker name
+- Environment name, route, workers.dev URL, or custom domain
+- Wrangler configuration file path and package manager
+- Build, test, and smoke-test commands
+- Binding inventory for KV, R2, D1, Durable Objects, Queues, service bindings, vars, and secrets
+- CI provider and secret names for `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN`
+- Rollback target, version history, or accepted recovery plan
+
+## Production Rules
+
+- Treat `wrangler deploy` as a live traffic mutation unless the command is explicitly a dry run or targets an isolated environment.
+- Install Wrangler locally in the project and pin the version used by CI.
+- Keep Wrangler configuration as the source of truth; avoid dashboard-only configuration drift unless it is intentionally documented.
+- Define bindings and vars per environment when Cloudflare marks them non-inheritable.
+- Do not store sensitive values in `vars`; use Worker secrets, `.dev.vars` for local development, or CI secret storage.
+- Use gradual deployment for high-blast-radius releases, compatibility-date changes, static asset compatibility changes, or uncertain runtime migrations.
+- Remember that Worker versions track bundled code and selected configuration, not the state of KV, R2, D1, Durable Objects, or downstream services.
+- Capture rollback instructions before the deploy, not after an incident starts.
+
+## Output Contract
+
+1. Deployment inventory: account, Worker, environment, route, bindings, secrets, triggers, and current Wrangler version.
+2. Risk classification: low, medium, or high with the reason, rollout mode, and rollback trigger.
+3. Command plan: exact package-manager commands, deploy or version commands, CI secret requirements, and smoke-test commands.
+4. Verification evidence: deployment status, live endpoint checks, logs/metrics inspected, and remaining caveats.
+5. Rollback and recovery plan: previous version ID or fallback deploy path plus any non-versioned storage/binding follow-up.
+
+## CI/CD Notes
+
+- Cloudflare documents non-interactive CI auth through `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` secrets.
+- Scope the API token to the account and zone that deploy the Worker; do not use broad account-wide tokens when a narrower token works.
+- Use `cloudflare/wrangler-action@v3` or a direct package-manager command, but keep the same Wrangler version policy as local development.
+- Protect production deploy workflows with branch rules, environments, approvals, or manual dispatch when the Worker serves real traffic.
+- Include `npx wrangler deploy --dry-run` or project build output checks before the mutation step when the project supports it.
+
+## Troubleshooting
+
+**Issue:** Deployment targeted the wrong Worker or account
+
+**Fix:** Check `wrangler whoami`, the active account ID, Worker name, environment suffix, route, and CI secret values before another deploy.
+
+**Issue:** Staging works but production fails after deploy
+
+**Fix:** Compare non-inheritable bindings, vars, routes, secrets, compatibility dates, and static asset settings between environments.
+
+**Issue:** Route, domain, or scheduled trigger changes did not take effect
+
+**Fix:** Confirm whether the change used uploaded versions. If it did, apply trigger changes with `npx wrangler triggers deploy`.
+
+**Issue:** Gradual rollout causes inconsistent user behavior
+
+**Fix:** Check asset compatibility, schema compatibility, and version affinity needs before increasing the rollout percentage.
+
+**Issue:** Rollback did not restore data behavior
+
+**Fix:** Worker rollback affects deployed Worker versions, not external storage state. Inspect KV, R2, D1, Durable Object migrations, queues, and downstream services separately.
+
+**Issue:** Logs are missing or too noisy
+
+**Fix:** Verify `observability.enabled`, environment-specific observability settings, head sampling rate, invocation log settings, and any Tail Worker or external log export path.
+
+## Validation Checklist
+
+- Wrangler version and official docs verified for the deployment date.
+- Local build, tests, and Worker dry-run or preview checks completed.
+- Account, environment, route, domain, trigger, and binding inventory reviewed.
+- Secrets are stored outside the repository and scoped to the deploy target.
+- CI workflow uses protected secrets and a project-pinned Wrangler version.
+- Gradual rollout or direct deploy mode is justified by release risk.
+- Live smoke checks and Workers Logs were inspected after deploy.
+- Rollback version or recovery deploy path is documented.
