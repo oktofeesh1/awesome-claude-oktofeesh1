@@ -1,0 +1,71 @@
+---
+title: LangChain
+slug: langchain
+category: tools
+description: Open-source framework for building agents and LLM applications with models, tools, prompts, middleware, memory, streaming, structured output, and integrations.
+cardDescription: Build agents and LLM apps with models, tools, prompts, memory, and integrations.
+seoTitle: LangChain framework for agents and LLM applications
+seoDescription: LangChain helps teams build agents and LLM applications with create_agent, models, tools, prompts, middleware, memory, streaming, structured output, and integrations.
+author: LangChain
+submittedBy: oktofeesh1
+submittedByUrl: "https://github.com/oktofeesh1"
+dateAdded: "2026-06-03"
+websiteUrl: "https://www.langchain.com/"
+documentationUrl: "https://docs.langchain.com/oss/python/langchain/overview"
+repoUrl: "https://github.com/langchain-ai/langchain"
+pricingModel: open-source
+disclosure: editorial
+applicationCategory: DeveloperApplication
+operatingSystem: macOS, Windows, Linux
+tags:
+  - agents
+  - llm-apps
+  - integrations
+keywords:
+  - langchain
+  - create agent
+  - llm application framework
+  - model integrations
+  - agent harness
+prerequisites:
+  - Python or JavaScript/TypeScript project using the LangChain package family and the integrations needed by the target application.
+  - Model provider credentials, local model configuration, or gateway configuration for the chat models, embeddings, rerankers, or tools used by the agent.
+  - Clear tool, retriever, memory, middleware, structured-output, and human-in-the-loop boundaries before giving an agent access to external systems.
+  - Test prompts, eval cases, representative documents, expected outputs, and reviewer ownership before using LangChain output in production workflows.
+  - Observability, trace retention, and redaction plan if LangSmith or another tracing backend is connected to the LangChain application.
+safetyNotes:
+  - LangChain's model, tool, prompt, middleware, retrieval, and memory abstractions make agent assembly easier, but they do not prove that model outputs or tool calls are correct or safe.
+  - Function tools, retrievers, toolkits, integrations, middleware, and MCP or external services can perform network, account, database, file, or business actions; review tool side effects before enabling them.
+  - Tool descriptions, retrieved documents, chat history, memory, middleware output, and third-party integration results become model-facing context and can carry stale, malicious, or prompt-injection-like instructions.
+  - Provider swapping and model interoperability can change cost, latency, rate limits, safety behavior, output shape, and data-handling terms, so production model changes should be reviewed rather than treated as drop-in.
+  - Human-in-the-loop, guardrail, runtime, memory, and deployment patterns need explicit approval, rollback, idempotency, and escalation policies before use in account-write or infrastructure workflows.
+  - LangSmith, custom callbacks, tracing integrations, and debug logs can expose sensitive run data if they are enabled without redaction and access controls.
+privacyNotes:
+  - LangChain applications can send prompts, system messages, conversation history, retrieved context, tool arguments, tool outputs, structured outputs, embeddings, and metadata to configured model or embedding providers.
+  - Tools and integrations can expose private repositories, tickets, databases, SaaS records, documents, secrets accidentally included in context, or customer data to the agent and its transcripts.
+  - Retrieval, memory, vector stores, long-term memory, and cached intermediate results can retain user or business data outside the original source system.
+  - LangSmith or other observability backends can store traces, prompts, outputs, tool calls, errors, latency, token usage, costs, and evaluator results for debugging and review.
+  - Example applications, quickstarts, and notebooks should not be copied into production with real API keys, raw customer documents, unreleased prompts, or permissive tool credentials.
+---
+
+## Editorial notes
+
+LangChain is useful when Claude-adjacent teams need a general-purpose framework for building LLM applications and configurable agents. Its current Python docs center the `create_agent` harness: combine a model, tools, prompt, and middleware, then add memory, streaming, structured output, retrieval, guardrails, human-in-the-loop behavior, and integrations as the application matures.
+
+This entry is intentionally scoped to LangChain itself, not the adjacent LangChain products already listed. LangGraph is the lower-level orchestration framework for advanced deterministic and agentic workflows. LangSmith is the tracing, debugging, and evaluation platform. LangChain is the open-source framework layer for composing the agent or LLM application around models, tools, prompts, middleware, memory, streaming, structured output, and provider integrations.
+
+## Source notes
+
+- The official GitHub repository describes LangChain as a framework for building agents and LLM-powered applications by chaining interoperable components and third-party integrations.
+- The current LangChain overview documentation describes `create_agent` as a minimal, highly configurable agent harness composed from a model, tools, prompt, and middleware.
+- The documentation says LangChain supports model providers such as OpenAI, Anthropic, Google, OpenRouter, Fireworks, Ollama, Azure, AWS Bedrock, and Hugging Face.
+- The official README distinguishes LangChain from LangGraph for controllable agent workflows and LangSmith for developing, debugging, and deploying AI agents and LLM applications.
+- The repository is `langchain-ai/langchain`, is MIT licensed, and describes the project as "The agent engineering platform."
+
+## Duplicate check
+
+Checked current `content/tools/`, `content/mcp/`, agents, hooks, rules, skills, commands, guides, open pull requests, live issue state, and repository-wide content for `LangChain`, `langchain-ai/langchain`, `docs.langchain.com/oss/python/langchain`, `python.langchain.com`, `js.langchain.com`, `create_agent`, `agent harness`, `model integrations`, and `LLM application framework`. Existing LangGraph and LangSmith entries are adjacent LangChain ecosystem products, and existing agent examples mention LangChain imports, but no dedicated LangChain tools entry, LangChain repository URL duplicate, canonical docs URL duplicate, or open duplicate PR was found.
+
+## Disclosure
+
+Editorial listing. No paid placement or affiliate link is used.
