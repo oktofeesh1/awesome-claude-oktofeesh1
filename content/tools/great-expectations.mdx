@@ -1,0 +1,79 @@
+---
+title: Great Expectations
+slug: great-expectations
+category: tools
+description: Apache-2.0 GX Core Python library for data quality Expectations, validation definitions, checkpoints, Data Docs, metadata stores, and pipeline quality checks.
+cardDescription: Define, run, document, and automate data quality validations with GX Core.
+seoTitle: Great Expectations GX Core data quality validation
+seoDescription: Great Expectations is an Apache-2.0 GX Core Python library for data quality Expectations, validation definitions, checkpoints, Data Docs, metadata stores, and pipeline quality checks.
+author: Great Expectations
+submittedBy: oktofeesh1
+submittedByUrl: "https://github.com/oktofeesh1"
+dateAdded: "2026-06-04"
+websiteUrl: "https://greatexpectations.io/"
+documentationUrl: "https://docs.greatexpectations.io/docs/core/introduction/"
+repoUrl: "https://github.com/great-expectations/great_expectations"
+pricingModel: open-source
+disclosure: editorial
+applicationCategory: DeveloperApplication
+operatingSystem: macOS, Linux
+tags:
+  - data-quality
+  - validation
+  - data-engineering
+keywords:
+  - Great Expectations
+  - GX Core
+  - data quality
+  - Expectations
+  - validation results
+prerequisites:
+  - Supported Python environment for GX Core, currently Python 3.10 through 3.13, with deployment expectations that do not assume official Windows support.
+  - Data Context choice, project layout, version control policy, and environment-specific configuration for development, CI, staging, and production validation workflows.
+  - Data Source and Data Asset plan for SQL databases, filesystem data, pandas DataFrames, Spark DataFrames, supported cloud storage, Batch Definitions, and runtime parameters.
+  - Expectation Suites, Validation Definitions, Checkpoints, Actions, Data Docs, Stores, result formats, and alerting rules designed around the data quality questions the team actually needs answered.
+  - Credential strategy for database connection strings, cloud storage, Slack or Teams tokens, environment variables, uncommitted config files, and supported cloud secrets managers.
+safetyNotes:
+  - GX Core validations can query databases, scan files, evaluate DataFrames, and compute metrics over real datasets, so production runs should use scoped credentials, tested queries, and bounded resources.
+  - Checkpoints can trigger Actions such as updating Data Docs, sending notifications, or running custom logic based on Validation Results; notification endpoints and custom Actions should be reviewed before automation.
+  - Data Docs generate static human-readable documentation from Expectations, Validation Results, and metadata, so hosted sites and generated folders need access controls before they include sensitive details.
+  - Result formats and unexpected-row retrieval can expose row-level failures or sample values; teams should tune result verbosity before publishing results to logs, tickets, chat, or docs sites.
+  - Custom Expectations, custom Actions, SQL-based custom Expectations, and orchestration integrations run team-provided code or queries and should be treated as trusted project code.
+  - GX Core compatibility depends on Python, data source, integration, and optional dependency support, so upgrades should be tested against the compatibility reference and existing validation suites.
+privacyNotes:
+  - GX Core workflows can process source data, schemas, table names, file paths, SQL queries, Batch metadata, Expectation Suites, Validation Results, Checkpoints, Actions, Data Docs, and generated stores.
+  - The credentials docs say tokens and connection strings should be stored securely outside version control, using environment variables, uncommitted config files, or supported secrets managers.
+  - File Data Context Stores can persist Expectation Suites, Validation Definitions, Checkpoints, Validation Results, and Suite Parameters in project folders or configured backends.
+  - Data Docs are static web pages generated from Expectations, Validation Results, and metadata; publishing them can disclose validation outcomes, column names, dataset structure, and failing examples.
+  - GX Core tracks analytics events by default, including feature usage, operating system, and Python version, and the docs describe disabling collection with `GX_ANALYTICS_ENABLED` or `analytics_enabled`.
+---
+
+## Editorial notes
+
+Great Expectations is useful when Claude-adjacent teams need source-controlled data quality checks for pipelines, warehouses, files, notebooks, batch jobs, analytics handoffs, feature data, and evaluation datasets. It gives agents and developers a shared vocabulary for data quality Expectations, repeatable validation definitions, checkable results, generated Data Docs, and automation hooks that can fit into CI, orchestration, and data review workflows.
+
+This entry covers the open-source GX Core library. It is distinct from dbt Core, DuckDB, Polars, Apache Airflow, and Dagster. dbt Core transforms warehouse data. DuckDB and Polars query or transform tabular data. Airflow schedules DAGs. Dagster orchestrates assets. Great Expectations focuses on declaring, running, storing, documenting, and responding to data quality validations.
+
+## Source notes
+
+- The official repository README describes GX Core as a package for data teams built around Expectations, which are expressive and extensible unit tests for data.
+- The README says GX Core can automatically generate documentation for validation results and recommends installing `great_expectations` in a Python virtual environment.
+- The README says GX Core supports Python 3.10 through 3.13 and points users to the compatibility reference for supported data sources and integrations.
+- The compatibility reference lists supported GX Core integrations and data sources such as Amazon S3, Azure Blob Storage, BigQuery, Databricks SQL, Microsoft SQL Server, pandas, PostgreSQL, Snowflake, Spark, and SQLite, and says Windows is not currently supported.
+- The introduction docs describe using the GX Core Python library and sample data to create a data validation workflow.
+- The connect-to-data docs describe connecting to SQL databases, filesystem data, pandas DataFrames, and Spark DataFrames, then organizing data into Batches for validation.
+- The run-validations docs describe validating Expectations against data, associating Batch Definitions with Expectation Suites through Validation Definitions, running Validation Definitions, and retrieving unexpected rows.
+- The trigger-actions docs describe Checkpoints that automate responses to Validation Results, including alerts, Data Docs updates, and custom Actions.
+- The credentials docs say credentials, tokens, and connection strings should be stored outside version control using environment variables, uncommitted config files, or supported cloud secrets managers.
+- The Data Docs docs say Data Docs translate Expectations, Validation Results, and other metadata into human-readable static web pages that can be built manually or updated by Checkpoint Actions.
+- The metadata-store docs say Stores persist project metadata including Expectation Suite configurations, Validation Definitions, Checkpoints, Validation Results, and Suite Parameters.
+- The analytics docs say Great Expectations tracks analytics events by default and describes disabling collection with `GX_ANALYTICS_ENABLED` or `analytics_enabled`.
+- The repository is `great-expectations/great_expectations`, is Apache-2.0 licensed, and is active.
+
+## Duplicate check
+
+Checked current `content/tools/`, `content/mcp/`, agents, hooks, rules, skills, commands, guides, collections, open pull requests, live issue state, and repository-wide content for `Great Expectations`, `GX Core`, `great_expectations`, `great-expectations`, `github.com/great-expectations/great_expectations`, `docs.greatexpectations.io`, and `greatexpectations.io`. Existing mentions appear only inside a data pipeline engineering agent and a data engineering collection; no dedicated Great Expectations tools entry, source URL duplicate, target file, issue duplicate, or open duplicate PR was found.
+
+## Disclosure
+
+Editorial listing. No paid placement or affiliate link is used. GX Core is Apache-2.0 open-source software; GX Cloud, data warehouses, cloud storage, databases, notebooks, orchestrators, notification services, secrets managers, and downstream documentation hosts may have separate licenses, billing, terms, privacy obligations, and access controls.
