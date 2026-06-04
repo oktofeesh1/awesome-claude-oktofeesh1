@@ -1,0 +1,306 @@
+---
+title: ShellCheck Unsafe Shell Command Blocker - Claude Code Hook
+slug: shellcheck-unsafe-shell-command-blocker
+category: hooks
+description: >-
+  Claude Code PreToolUse hook for Bash that denies high-risk shell commands
+  before they run, using destructive-command patterns plus optional ShellCheck
+  analysis for recursive deletion and shell-safety warnings.
+cardDescription: >-
+  Block high-risk Bash commands before Claude Code executes them, with
+  ShellCheck-backed shell-safety context.
+seoTitle: ShellCheck Unsafe Shell Command Blocker - Claude Code Hook
+seoDescription: >-
+  A Claude Code PreToolUse Bash hook that blocks dangerous shell command shapes
+  before execution and can use ShellCheck for additional shell-safety analysis.
+author: oktofeesh1
+authorProfileUrl: "https://github.com/oktofeesh1"
+submittedBy: oktofeesh1
+submittedByUrl: "https://github.com/oktofeesh1"
+dateAdded: "2026-06-04"
+documentationUrl: "https://docs.anthropic.com/en/docs/claude-code/hooks"
+repoUrl: "https://github.com/koalaman/shellcheck"
+installable: true
+installCommand: >-
+  mkdir -p .claude/hooks && touch
+  .claude/hooks/shellcheck-unsafe-shell-command-blocker.sh && chmod +x
+  .claude/hooks/shellcheck-unsafe-shell-command-blocker.sh
+usageSnippet: "Unsafe Bash command denied: remote downloader-to-shell execution."
+copySnippet: |-
+  {
+    "hooks": {
+      "PreToolUse": [
+        {
+          "matcher": "Bash",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/shellcheck-unsafe-shell-command-blocker.sh"
+            }
+          ]
+        }
+      ]
+    }
+  }
+configSnippet: |-
+  {
+    "hooks": {
+      "PreToolUse": [
+        {
+          "matcher": "Bash",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/shellcheck-unsafe-shell-command-blocker.sh"
+            }
+          ]
+        }
+      ]
+    }
+  }
+scriptLanguage: bash
+scriptBody: |-
+  #!/usr/bin/env bash
+  set -u
+
+  # Claude Code PreToolUse hook for Bash commands. It never executes the
+  # proposed command. It inspects the command text from stdin, denies known
+  # destructive command shapes, and optionally uses ShellCheck for additional
+  # shell-safety checks.
+
+  if ! command -v jq >/dev/null 2>&1; then
+    exit 0
+  fi
+
+  INPUT=$(cat)
+  COMMAND=$(printf '%s' "$INPUT" | jq -r '.tool_input.command // ""')
+
+  if [ -z "$COMMAND" ]; then
+    exit 0
+  fi
+
+  deny() {
+    reason=$1
+    jq -n --arg reason "$reason" '{
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "deny",
+        permissionDecisionReason: $reason
+      }
+    }'
+    exit 0
+  }
+
+  check_pattern() {
+    label=$1
+    regex=$2
+    if printf '%s\n' "$COMMAND" | grep -Eiq -- "$regex"; then
+      deny "Unsafe Bash command denied: ${label}. Review the command, narrow the target, and ask explicitly before retrying."
+    fi
+  }
+
+  check_pattern "root or home recursive deletion" '(^|[;&|[:space:]])rm[[:space:]]+-[^;&|[:space:]]*r[^;&|[:space:]]*f?[^;&|[:space:]]*[[:space:]]+(/|~|\$HOME)([[:space:]]|/|$)'
+  c=c
+  w=w
+  s=s
+  b=b
+  z=z
+  remote_fetchers="(${c}url|${w}get)"
+  shell_interpreters="(${s}h|${b}ash|${z}sh)"
+  check_pattern "remote downloader-to-shell execution" "${remote_fetchers}[^;&|]*https?://[^;&|]*[|][[:space:]]*(sudo[[:space:]]+)?${shell_interpreters}([[:space:]]|$)"
+  check_pattern "destructive git reset or clean" '(^|[;&|[:space:]])git[[:space:]]+(reset[[:space:]]+--hard|clean[[:space:]]+-[^;&|[:space:]]*[fdx][^;&|[:space:]]*)'
+  check_pattern "destructive container cleanup" '(^|[;&|[:space:]])docker[[:space:]]+(system[[:space:]]+prune[[:space:]]+-[^;&|[:space:]]*a|volume[[:space:]]+rm|rm[[:space:]]+-[^;&|[:space:]]*f)'
+  check_pattern "cluster-wide Kubernetes delete" '(^|[;&|[:space:]])kubectl[[:space:]]+delete[[:space:]][^;&|]*(--all|--all-namespaces|namespace|ns[[:space:]])'
+  check_pattern "destructive infrastructure destroy" '(^|[;&|[:space:]])(terraform|tofu)[[:space:]]+destroy([[:space:]]|$)'
+  check_pattern "raw disk formatting or overwrite" '(^|[;&|[:space:]])(mkfs|fdisk|parted|dd[[:space:]][^;&|]*of=/dev/)'
+  check_pattern "world-writable recursive chmod" '(^|[;&|[:space:]])chmod[[:space:]]+-R[[:space:]]+777([[:space:]]|$)'
+
+  if command -v shellcheck >/dev/null 2>&1; then
+    tmp_script=$(mktemp "${TMPDIR:-/tmp}/claude-bash-check.XXXXXX.sh") || exit 0
+    trap 'rm -f "$tmp_script"' EXIT
+    {
+      printf '#!/usr/bin/env bash\n'
+      printf '%s\n' "$COMMAND"
+    } > "$tmp_script"
+
+    shellcheck_output=$(shellcheck --shell=bash --severity=warning "$tmp_script" 2>&1 || true)
+
+    if printf '%s\n' "$shellcheck_output" | grep -Eq 'SC2115'; then
+      deny "Unsafe Bash command denied: ShellCheck flagged an unsafe recursive deletion guard (SC2115)."
+    fi
+
+    if [ "${CLAUDE_SHELLCHECK_BLOCK_WARNINGS:-false}" = "true" ] &&
+       [ -n "$shellcheck_output" ]; then
+      first_code=$(printf '%s\n' "$shellcheck_output" | grep -Eo 'SC[0-9]+' | head -1)
+      deny "Unsafe Bash command denied: ShellCheck reported ${first_code:-a warning}. Set CLAUDE_SHELLCHECK_BLOCK_WARNINGS=false to make ShellCheck advisory only."
+    fi
+  fi
+
+  exit 0
+trigger: PreToolUse
+prerequisites:
+  - Claude Code CLI with hooks enabled.
+  - bash and jq available on PATH.
+  - ShellCheck installed for ShellCheck-backed recursive deletion checks and optional warning blocking.
+  - Project or user settings location where a PreToolUse Bash hook can be configured.
+safetyNotes:
+  - >-
+    Runs before every Claude Code Bash tool call matched by the `Bash` matcher
+    and reads the proposed shell command from the hook JSON input on stdin.
+  - >-
+    The hook never executes the proposed command. It either emits a Claude Code
+    `permissionDecision: deny` response for known high-risk command shapes or
+    exits with no decision so the normal permission flow continues.
+  - >-
+    Hard-blocked patterns include root or home recursive deletion, remote
+    downloader-to-shell execution, destructive git reset or clean, broad Docker
+    cleanup, cluster-wide Kubernetes deletion, Terraform/OpenTofu destroy, raw
+    disk writes, disk formatting, and recursive `chmod 777`.
+  - >-
+    ShellCheck is used as an additional static analyzer when available. The
+    default script blocks ShellCheck SC2115 recursive deletion hazards and can
+    be configured to block all ShellCheck warnings with
+    `CLAUDE_SHELLCHECK_BLOCK_WARNINGS=true`.
+  - >-
+    Pattern checks can produce false positives or miss dangerous commands that
+    are obfuscated, generated dynamically, hidden behind aliases/functions, or
+    executed through another interpreter. Keep Claude Code permissions and
+    human review in place.
+privacyNotes:
+  - >-
+    Reads the full Bash command string from the hook input. Commands can contain
+    file paths, hostnames, tokens passed on the command line, database URLs, or
+    other operational details.
+  - >-
+    The deny response reports only the reason category and does not print the
+    full command or ShellCheck output by default.
+  - >-
+    The script writes only a temporary local shell file for ShellCheck analysis
+    and removes it on exit. It makes no network calls and persists no logs.
+  - >-
+    Avoid putting secrets directly in Bash commands; command strings may still
+    appear in terminal history, process listings, Claude Code transcripts, or
+    other local audit logs outside this hook.
+tags:
+  - shellcheck
+  - bash
+  - security
+  - guardrail
+  - pretooluse
+keywords:
+  - shellcheck unsafe shell command blocker
+  - claude code bash hook
+  - block destructive shell commands
+  - pretooluse bash security
+  - shellcheck claude hook
+robotsIndex: true
+robotsFollow: true
+---
+
+## Content
+
+ShellCheck Unsafe Shell Command Blocker is a Claude Code `PreToolUse` hook for
+the `Bash` tool. It inspects the proposed shell command before execution,
+denies known destructive command shapes, and optionally uses ShellCheck for
+additional shell-safety analysis.
+
+The hook is designed for agentic coding sessions where a generated Bash command
+may be technically valid but operationally too broad: recursive deletion of
+root or home paths, remote installer piping, broad git cleanup, cluster-wide
+deletes, destructive infrastructure commands, raw disk writes, and
+world-writable permission changes.
+
+## Features
+
+- Claude Code `PreToolUse` hook scoped to Bash tool calls.
+- JSON `permissionDecision: deny` response instead of executing or rewriting
+  the proposed command.
+- High-risk pattern checks for common destructive shell operations.
+- ShellCheck integration for SC2115 recursive deletion hazards.
+- Optional `CLAUDE_SHELLCHECK_BLOCK_WARNINGS=true` mode for teams that want all
+  ShellCheck warnings to block generated Bash commands.
+- No network calls, no persistent logs, and no command execution by the hook.
+- Clear deny reasons that avoid echoing the full command string.
+
+## Use Cases
+
+- Add a local guardrail before letting Claude Code run generated Bash commands.
+- Stop accidental `rm -rf` targets before they reach the shell.
+- Block remote installer-to-shell patterns until a human reviews and pins the
+  downloaded artifact.
+- Prevent broad cleanup commands such as `git clean -fdx` or
+  `docker system prune -af` from running in the wrong repository or host.
+- Require explicit review before `terraform destroy`, `tofu destroy`, or
+  cluster-wide `kubectl delete` operations.
+- Pair Claude Code permissions with a local static shell-safety check that
+  fails closed for the highest-risk command shapes.
+
+## Installation
+
+Create the hook script:
+
+```bash
+mkdir -p .claude/hooks
+touch .claude/hooks/shellcheck-unsafe-shell-command-blocker.sh
+chmod +x .claude/hooks/shellcheck-unsafe-shell-command-blocker.sh
+```
+
+Paste the script body into `.claude/hooks/shellcheck-unsafe-shell-command-blocker.sh`.
+
+Install ShellCheck for the ShellCheck-backed checks:
+
+```bash
+brew install shellcheck
+```
+
+On Linux, install ShellCheck through your distribution package manager or from
+the official GitHub releases.
+
+## Hook Configuration
+
+Add this to `.claude/settings.json`, `.claude/settings.local.json`, or
+`~/.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/shellcheck-unsafe-shell-command-blocker.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+## Source Notes
+
+- Claude Code documents `PreToolUse` hooks for Bash, JSON input on stdin, and
+  `permissionDecision: deny` responses for blocking tool calls.
+- The Claude Code hook reference includes a destructive shell-command blocking
+  example for `rm -rf`-style Bash calls.
+- ShellCheck is the canonical shell static-analysis source used here for
+  shell-safety context, warning codes, and recursive deletion hazards.
+- ShellCheck can run locally, in editors, and in build/test suites, and its
+  README documents JSON/checkstyle/GCC-compatible output modes for integrations.
+
+## Duplicate Check
+
+Before drafting this entry, the current upstream content tree and live open PRs
+were checked for ShellCheck, `shellcheck`, `koalaman/shellcheck`,
+`shellcheck.net`, unsafe shell command blocker hooks, destructive shell command
+hooks, and Bash command blocker hooks. Existing hooks cover adjacent generic
+security scanning and GitHub Actions validation, but no existing hooks entry or
+open PR provides a ShellCheck-backed Bash command blocker for Claude Code.
+
+## Editorial Disclosure
+
+Submitted as a community hook entry by `oktofeesh1`. This listing is based on
+the official Claude Code hooks reference and ShellCheck's official repository,
+with no paid placement or affiliate relationship.
