@@ -1,0 +1,86 @@
+---
+title: Streamlit
+slug: streamlit
+category: tools
+description: Apache-2.0 Python framework for turning scripts into interactive data apps, dashboards, reports, chat apps, multipage tools, and deployable analytical interfaces.
+cardDescription: Turn Python scripts into interactive data apps, dashboards, and chat interfaces.
+seoTitle: Streamlit Python data app framework
+seoDescription: Streamlit is an Apache-2.0 Python framework for turning scripts into interactive data apps, dashboards, reports, chat apps, multipage tools, and deployable analytical interfaces.
+author: Streamlit
+submittedBy: oktofeesh1
+submittedByUrl: "https://github.com/oktofeesh1"
+dateAdded: "2026-06-04"
+websiteUrl: "https://streamlit.io/"
+documentationUrl: "https://docs.streamlit.io/get-started"
+repoUrl: "https://github.com/streamlit/streamlit"
+pricingModel: open-source
+disclosure: editorial
+applicationCategory: DeveloperApplication
+operatingSystem: macOS, Windows, Linux
+tags:
+  - data-apps
+  - dashboards
+  - python
+keywords:
+  - Streamlit
+  - Python data apps
+  - dashboards
+  - chat apps
+  - multipage apps
+prerequisites:
+  - Python environment with Streamlit and project dependencies installed for the selected local, Codespaces, Snowflake, Community Cloud, or self-hosted deployment path.
+  - App architecture plan for Streamlit's top-to-bottom rerun model, widgets, forms, fragments, callbacks, Session State, caching, multipage routing, and long-running operations.
+  - Data and connection plan for local files, DataFrames, SQL databases, Snowflake, APIs, credentials, environment variables, secrets, and external service quotas.
+  - Deployment plan for dependency installation, remote `streamlit run`, secrets handling, configuration, authentication, authorization, static assets, logging, and app sharing.
+  - Security review for custom components, embedded HTML or iframes, chat or LLM integrations, uploaded files, user-specific state, and public-facing app permissions.
+safetyNotes:
+  - Streamlit apps execute Python scripts and rerun code from top to bottom on user interaction or code changes, so destructive writes, API calls, database mutations, long jobs, and side effects need explicit guards.
+  - Cached data can be global across users, sessions, and reruns, while Session State is scoped to a browser session; teams should avoid accidentally sharing user-specific or sensitive data through global caches.
+  - The Streamlit security docs warn that `st.cache_data` and `st.session_state` use Python pickle internally, and that malicious pickle data can execute arbitrary code during unpickling.
+  - Cached resources such as database connections and ML models can be shared globally and must be thread-safe, or should be scoped per session when isolation is required.
+  - Secrets should not be committed to repositories; Streamlit supports environment variables, local or project secrets files, and platform-specific secret storage.
+  - OIDC authentication identifies users but does not provide authorization or delegated OAuth access by itself, so apps still need explicit permission checks for admin actions and user-specific data.
+  - Custom components, embedded HTML, iframes, JavaScript, media, file uploaders, and third-party packages should be treated as trusted app code and reviewed before public deployment.
+  - Chat elements and LLM integrations can call external APIs and stream long-running responses, so prompts, attachments, generated outputs, rate limits, and provider credentials need operational limits.
+privacyNotes:
+  - Streamlit apps can process Python source, widget inputs, uploaded files, session state, cached results, DataFrames, SQL queries, database rows, charts, maps, chat prompts, logs, and rendered outputs.
+  - Secrets can be loaded from `st.secrets`, TOML files, environment variables, deployment settings, or third-party secret managers; these values should stay out of source control, screenshots, app output, and logs.
+  - Community Cloud and other hosted deployment paths can involve GitHub account connection, source repository access, app metadata, runtime logs, dependency installation, secrets configuration, and platform-specific retention policies.
+  - OIDC login stores identity information and an identity cookie for the app session; user profile fields, login status, and authorization decisions should be treated as sensitive app data.
+  - Global caches, global resources, and persisted session data can expose values across users or reruns if the app does not separate public, shared, and user-specific data deliberately.
+  - Custom components, embedded iframes, external APIs, databases, warehouses, LLM providers, and analytics services may receive user inputs, prompts, query results, browser metadata, or credentials depending on app design.
+---
+
+## Editorial notes
+
+Streamlit is useful when Claude-adjacent teams need quick internal tools, data review apps, dashboard prototypes, evaluation viewers, report generators, LLM demos, and analytical interfaces without building a full frontend stack. Its Python-first execution model makes it straightforward for agents and developers to generate, inspect, test, and iterate on app code that stays close to the underlying data workflow.
+
+This entry covers the open-source Streamlit framework. It is distinct from Marimo, Gradio, Chainlit, DuckDB, and Polars. Marimo focuses on reactive notebooks that are stored as pure Python and can run as scripts or apps. Gradio focuses on machine-learning demos and model interfaces. Chainlit focuses on conversational AI apps. DuckDB is an embedded analytical SQL database. Polars is a DataFrame query engine. Streamlit focuses on turning Python scripts into interactive web apps for data, dashboards, reports, chat, and internal tools.
+
+## Source notes
+
+- The official repository describes Streamlit as a faster way to build and share data apps.
+- The README says Streamlit transforms Python scripts into interactive web apps and can be used for dashboards, reports, and chat apps.
+- The README highlights Pythonic development, fast interactive prototyping, live editing, widgets, DataFrames, charts, layouts, multipage apps, the app gallery, Streamlit Components, Community Cloud, and Apache-2.0 licensing.
+- The Get Started docs cover installation on Windows, macOS, and Linux, as well as browser-based development with GitHub Codespaces or Streamlit in Snowflake.
+- The Get Started docs say the fundamentals cover displaying and styling data, charts and maps, interactive widgets, layouts, caching, and themes.
+- The caching docs say Streamlit reruns scripts from top to bottom on user interaction or code change, and that caching helps avoid rerunning long functions or recreating objects.
+- The `st.cache_data` API docs say cached data can be global across users, sessions, and reruns or scoped to a current session, and that cached objects are stored in pickled form.
+- The `st.cache_resource` API docs say cached resources can be global or session-scoped, global resources are shared across users and reruns, and global resources must be thread-safe.
+- The Session State docs say each browser tab is a session, Streamlit reruns scripts on interaction, and Session State persists variables between reruns for a user session and across pages in a multipage app.
+- The multipage app docs describe `st.Page`, `st.navigation`, and the simpler `pages/` directory mechanism for creating multiple app pages.
+- The secrets-management docs say unencrypted secrets should not be committed to repositories and describe local, project, environment-variable, and platform-specific secret options.
+- The security reminders warn about protecting secrets, keeping `.gitignore` updated, and avoiding untrusted pickle data when using `st.cache_data`, `st.session_state`, or deprecated cache behavior.
+- The authentication docs say Streamlit supports OIDC with providers such as Google Identity, Microsoft Entra ID, Okta, and Auth0, and explains `st.login`, `st.user`, and `st.logout`.
+- The chat elements docs describe `st.chat_input`, `st.chat_message`, `st.status`, and `st.write_stream` for conversational apps and streamed outputs.
+- The app testing docs describe headless app tests through `streamlit.testing.v1.AppTest`, including simulated user input and rendered-output inspection that can run with tools such as pytest.
+- The deployment docs describe installing Python, Streamlit, and dependencies, securely handling secrets, and remotely starting apps with `streamlit run`.
+- The repository is `streamlit/streamlit`, is Apache-2.0 licensed, active, and maintained by the Streamlit project.
+
+## Duplicate check
+
+Checked current `content/tools/`, `content/mcp/`, agents, hooks, rules, skills, commands, guides, collections, open pull requests, live issue state, and repository-wide content for `Streamlit`, `streamlit/streamlit`, `github.com/streamlit/streamlit`, `docs.streamlit.io`, `streamlit.io`, `Python data apps`, `dashboards`, and `chat apps`. Existing mentions are contextual references inside Python data-science rules and the Marimo distinction notes; no dedicated Streamlit tools entry, source URL duplicate, target file, issue duplicate, semantic duplicate, or open duplicate PR was found.
+
+## Disclosure
+
+Editorial listing. No paid placement or affiliate link is used. Streamlit is Apache-2.0 open-source software; Streamlit Community Cloud, Streamlit in Snowflake, Snowflake services, GitHub Codespaces, databases, warehouses, LLM providers, custom components, cloud hosts, and downstream deployment services may have separate licenses, billing, terms, privacy obligations, and access controls.
