@@ -1,0 +1,73 @@
+---
+title: BAML
+slug: baml
+category: tools
+description: Open-source prompt and schema language from BoundaryML for typed LLM functions, generated clients, tests, streaming, retries, and provider switching.
+cardDescription: Write typed LLM functions with schemas, generated clients, tests, and providers.
+seoTitle: BAML prompt schema language for LLM functions
+seoDescription: BAML helps teams define typed LLM functions, generate clients, test prompts in the IDE, parse structured outputs, stream responses, retry failures, and switch providers.
+author: BoundaryML
+submittedBy: oktofeesh1
+submittedByUrl: "https://github.com/oktofeesh1"
+dateAdded: "2026-06-03"
+websiteUrl: "https://www.boundaryml.com/"
+documentationUrl: "https://docs.boundaryml.com/"
+repoUrl: "https://github.com/BoundaryML/baml"
+pricingModel: open-source
+disclosure: editorial
+applicationCategory: DeveloperApplication
+operatingSystem: macOS, Windows, Linux
+tags:
+  - structured-output
+  - prompt-engineering
+  - open-source
+keywords:
+  - baml
+  - boundaryml
+  - schema-aligned parsing
+  - generated llm clients
+  - prompt testing
+prerequisites:
+  - Supported application language such as Python, TypeScript, Go, Ruby, Rust, Java, C#, or a REST integration path for calling generated BAML clients.
+  - BAML CLI, language package, editor extension, and a committed `baml_src` layout reviewed before generating client code into an application repository.
+  - Model provider credentials, local model endpoint, or OpenAI-compatible route for the LLM clients referenced in BAML functions, tests, retries, and fallbacks.
+  - Test snippets, asserts, sample inputs, media fixtures, provider budgets, and reviewer ownership before relying on BAML tests or playground runs for release decisions.
+  - Retention and redaction plan for prompts, structured outputs, generated clients, playground traces, observability data, and model-provider request logs.
+safetyNotes:
+  - BAML can improve output structure and type safety, but a schema-valid response can still be false, biased, incomplete, policy-violating, or unsafe for automated downstream action.
+  - Generated clients, retries, fallbacks, provider switching, streaming, and function-call-style outputs should not trigger account, billing, code, infrastructure, or data writes without domain validation and approval gates.
+  - Tests and playground runs are useful development signals, not proof that a prompt, schema, model, fallback chain, or agent workflow is safe in production.
+  - Switching providers or using OpenAI-compatible local models can change model behavior, tool-use reliability, token limits, latency, cost, privacy posture, and output quality.
+  - Prompt snippets, schemas, role metadata, headers, model options, and provider configuration should be reviewed before exposing them to untrusted users or sharing generated code.
+  - Media, URL, PDF, audio, and image inputs used in tests or functions need provenance, size, licensing, and content-safety review before committing or sending them to a model provider.
+privacyNotes:
+  - BAML functions can send prompts, typed inputs, test cases, examples, media references, structured outputs, retry context, and validation failures to the configured model provider.
+  - Local `.baml` files, generated client code, test snippets, prompt previews, playground state, logs, traces, and repository history can preserve sensitive prompts or business schemas.
+  - Provider keys such as Anthropic or OpenAI credentials, custom base URLs, headers, prompt-caching metadata, and model routing rules should stay in environment configuration rather than committed source.
+  - Boundary Studio or other observability flows can retain usage, prompts, responses, errors, token counts, or metadata outside the application runtime if enabled.
+  - Structured extraction outputs are easier to query and join than free-form prose, so access controls, retention periods, deletion workflows, and export policies should cover generated records.
+---
+
+## Editorial notes
+
+BAML is useful when Claude-adjacent teams want prompt engineering to live in typed, reviewable source files instead of scattered string templates. It lets developers define LLM functions in `.baml` files, generate language-specific clients, test prompts in an IDE playground, stream typed outputs, parse messy model responses into structured data, and switch between providers such as Anthropic, OpenAI, local OpenAI-compatible endpoints, and other backends.
+
+This is distinct from existing structured-output, eval, agent, and serving entries. Instructor focuses on Python/Pydantic response-model validation. Pydantic AI is a Python agent framework. DSPy focuses on programming and optimizing language-model systems. Promptfoo focuses on prompt testing and red teaming. vLLM and llama.cpp serve models. BAML's center of gravity is the prompt/schema language plus generated client workflow: source-controlled `.baml` functions, tests, prompt previews, provider declarations, schema-aligned parsing, and typed clients for multiple application languages.
+
+## Source notes
+
+- The official README describes BAML as a simple prompting language for building reliable AI workflows and agents, with schema engineering, type safety, streaming, retries, wide model support, and structured outputs even when a model lacks native tool-calling APIs.
+- The "What is BAML?" docs show a BAML function definition, generated `baml_client` code, and examples calling the same function from Python, TypeScript, Go, and Ruby, while noting BAML can work alongside existing LLM frameworks.
+- The Python installation docs cover installing `baml-py`, running `baml-cli init`, generating `baml_client`, converting `.baml` types into Pydantic models, and using the VS Code or Cursor extension for syntax highlighting, testing playground, and prompt previews.
+- The testing docs show BAML `test` snippets with asserts in the VS Code Playground and document file, URL, and base64 media inputs for image and audio test cases.
+- The switching-LLMs docs say BAML supports structured output from major providers and OpenAI-compatible open-source models, including provider strings such as `anthropic/model-name`, named clients, retry policies, fallbacks, and a client registry.
+- The Anthropic provider reference documents `provider anthropic`, default `ANTHROPIC_API_KEY` usage, base URL and header options, streaming behavior, prompt-caching metadata, and finish-reason controls.
+- The GitHub repository is `BoundaryML/baml`, is Apache-2.0 licensed, and describes BAML as an AI framework that adds engineering to prompt engineering.
+
+## Duplicate check
+
+Checked current `content/tools/`, `content/mcp/`, agents, hooks, rules, skills, commands, guides, open pull requests, live issue state, and repository-wide content for `BAML`, `BoundaryML`, `boundaryml.com`, `docs.boundaryml.com`, `github.com/BoundaryML/baml`, `Prompt Fiddle`, `promptfiddle.com`, `schema-aligned parsing`, `baml_src`, `baml_client`, `generated LLM clients`, and `prompt testing`. Existing Instructor, Pydantic AI, DSPy, Promptfoo, vLLM, llama.cpp, and structured-output mentions cover adjacent validation, agent, optimization, eval, serving, or runtime workflows, but no dedicated BAML tools entry, BAML source URL duplicate, or open duplicate PR was found.
+
+## Disclosure
+
+Editorial listing. No paid placement or affiliate link is used.
