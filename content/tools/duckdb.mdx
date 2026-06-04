@@ -1,0 +1,80 @@
+---
+title: DuckDB
+slug: duckdb
+category: tools
+description: MIT-licensed embedded analytical SQL database for local OLAP workloads, data files, notebooks, Python and R clients, extensions, and single-file analytics workflows.
+cardDescription: Run embedded analytical SQL over local files, data frames, and DuckDB databases.
+seoTitle: DuckDB embedded analytical SQL database
+seoDescription: DuckDB is an MIT-licensed embedded analytical SQL database for local OLAP workloads, data files, notebooks, Python and R clients, extensions, and single-file analytics workflows.
+author: DuckDB Foundation
+submittedBy: oktofeesh1
+submittedByUrl: "https://github.com/oktofeesh1"
+dateAdded: "2026-06-04"
+websiteUrl: "https://duckdb.org/"
+documentationUrl: "https://duckdb.org/docs/current/clients/overview"
+repoUrl: "https://github.com/duckdb/duckdb"
+pricingModel: open-source
+disclosure: editorial
+applicationCategory: DeveloperApplication
+operatingSystem: macOS, Windows, Linux, WebAssembly
+tags:
+  - analytics-database
+  - sql
+  - data-engineering
+keywords:
+  - DuckDB
+  - embedded OLAP
+  - analytical SQL
+  - Parquet
+  - data files
+prerequisites:
+  - DuckDB distribution and client choice for the workflow, such as the CLI, Python, R, Java, Node.js, C or C++ APIs, Rust, ODBC, JDBC, or WebAssembly.
+  - Data access plan for local DuckDB files, in-memory databases, CSV, Parquet, JSON, Arrow, pandas, R data frames, lakehouse formats, HTTP sources, S3-compatible storage, and mounted working directories.
+  - Version, extension, and file-format compatibility policy for shared notebooks, CI jobs, production scripts, persisted database files, and generated analytical artifacts.
+  - Resource controls for memory, threads, temporary directories, maximum temporary directory size, checkpointing, write-ahead logs, and long-running analytical queries.
+  - Security model for trusted SQL authors, untrusted input, file-system access, external network access, extension installation, object-store credentials, secrets, and generated query output.
+safetyNotes:
+  - DuckDB SQL should be treated like executable code because queries can read and write files, access network resources through extensions, load extensions, consume system resources, and mutate attached databases.
+  - Applications that accept user-controlled SQL, file paths, table names, filter expressions, or data-source settings need sandboxing and allowlists rather than passing those values directly into DuckDB operations.
+  - Extensions run with the same privileges as the DuckDB process, and community extensions should only be installed from trusted sources after reviewing their maintenance and distribution path.
+  - Statements such as `ATTACH`, `COPY`, `EXPORT DATABASE`, `CREATE SECRET`, `INSERT`, `UPDATE`, and `DELETE` can change local files, databases, or connected services when permissions allow it.
+  - Analytical queries can use substantial CPU, memory, temporary disk, and object-store bandwidth, so shared automations should configure memory, thread, timeout, temp-directory, and retry expectations.
+  - Persistent database files and write-ahead logs need backups, file permissions, and recovery procedures before DuckDB is used for durable or production-adjacent analytical state.
+privacyNotes:
+  - DuckDB workflows can process local files, database files, notebooks, query text, table names, column names, object-store paths, data-frame contents, connection strings, secrets, extensions, and generated result sets.
+  - The files-created docs describe global files such as `~/.duckdb_history`, extension directories, and stored persistent secrets, so users should avoid typing credentials or sensitive data into ad hoc SQL history.
+  - Persistent secrets are stored under DuckDB's configured secret directory, and `duckdb_secrets()` redacts sensitive fields by default; enabling unredacted secret output is unsafe with untrusted SQL.
+  - On-disk databases can create database files, write-ahead logs, and temporary directories next to the database file or working directory, depending on connection mode and configuration.
+  - HTTP, S3, and other external-data workflows can expose object-store identifiers, paths, credentials, request metadata, and result data to the connected service and any configured logs or monitoring.
+---
+
+## Editorial notes
+
+DuckDB is useful when Claude-adjacent teams need fast local analytics over data files, notebooks, evaluation outputs, logs, parquet datasets, ad hoc CSV exports, feature-engineering experiments, and lightweight analytical databases without running a separate database server. It gives agents and developers a compact SQL engine for inspecting data, joining files, validating transformations, and producing repeatable analytical artifacts close to the workspace.
+
+This is distinct from dbt Core, Apache Airflow, and Dagster. dbt Core structures and runs warehouse transformation projects. Airflow schedules workflow DAGs. Dagster orchestrates software-defined assets and operational metadata. DuckDB is the embedded analytical database engine that can execute SQL over files, data frames, extensions, and local database files inside scripts, notebooks, tools, and applications.
+
+## Source notes
+
+- The official repository describes DuckDB as a high-performance analytical database system with a rich SQL dialect, a standalone CLI, and clients for Python, R, Java, WebAssembly, and other environments.
+- The repository documents simple direct querying of CSV and Parquet files by referencing file names in SQL.
+- The installation page lists current stable and LTS installation options, including binaries and packages for major programming languages and platforms.
+- The official why page says DuckDB is an embedded in-process relational DBMS, does not require separate server software, and targets analytical query workloads.
+- The why page describes portability across major operating systems and CPU architectures, APIs for C, C++, Go, Python, R, Rust, Java, Node.js, and other languages, and deep Python and R integrations.
+- The why page says DuckDB uses a columnar-vectorized query execution engine for OLAP workloads and is released under the MIT License.
+- The DuckDB Foundation page says the independent non-profit DuckDB Foundation safeguards long-term maintenance and development and holds most project intellectual property.
+- The client overview docs list CLI, Python, R, Java, Node.js, ODBC, Rust, WebAssembly, Swift, Julia, Dart, and related client APIs.
+- The data import docs describe efficient loading and querying for CSV, Parquet, and JSON files.
+- The configuration docs describe settings for memory limits, worker threads, external access, disabled file systems, extension directories, home directories, secret directories, temporary directories, and maximum temporary directory size.
+- The extension docs describe built-in, core, and community extensions, explicit `INSTALL` and `LOAD` statements, autoloading, local extension directories, and signed community extensions.
+- The securing DuckDB docs warn to treat SQL like Bash or Python code, explain risks from untrusted SQL and non-SQL input, and describe restrictions for file access, external access, extensions, and secrets.
+- The files-created docs describe `~/.duckdb_history`, `~/.duckdb/extensions`, `~/.duckdb/stored_secrets`, database files, temporary directories, and write-ahead logs.
+- The repository is `duckdb/duckdb`, is MIT licensed, and is active.
+
+## Duplicate check
+
+Checked current `content/tools/`, `content/mcp/`, agents, hooks, rules, skills, commands, guides, collections, open pull requests, live issue state, and repository-wide content for `DuckDB`, `duckdb`, `duckdb/duckdb`, `github.com/duckdb/duckdb`, `duckdb.org`, `duckdb.foundation`, `embedded OLAP`, and `analytical SQL`. No dedicated DuckDB tools entry, source URL duplicate, target file, issue duplicate, or open duplicate PR was found.
+
+## Disclosure
+
+Editorial listing. No paid placement or affiliate link is used. DuckDB is MIT-licensed open-source software; DuckDB Labs services, cloud platforms, object stores, notebooks, BI tools, extensions, deployment environments, and downstream systems may have separate licenses, billing, terms, privacy obligations, and access controls.
