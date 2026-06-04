@@ -1,0 +1,79 @@
+---
+title: Polars
+slug: polars
+category: tools
+description: MIT-licensed DataFrame query engine written in Rust for Python, Rust, Node.js, R, and SQL workflows with lazy execution, streaming, Arrow integration, and file, database, and cloud I/O.
+cardDescription: Use a fast Rust DataFrame query engine for local, lazy, and cloud-backed analytics.
+seoTitle: Polars DataFrame query engine
+seoDescription: Polars is an MIT-licensed DataFrame query engine written in Rust for Python, Rust, Node.js, R, and SQL workflows with lazy execution, streaming, Arrow integration, and file, database, and cloud I/O.
+author: Polars
+submittedBy: oktofeesh1
+submittedByUrl: "https://github.com/oktofeesh1"
+dateAdded: "2026-06-04"
+websiteUrl: "https://pola.rs/"
+documentationUrl: "https://docs.pola.rs/user-guide/getting-started/"
+repoUrl: "https://github.com/pola-rs/polars"
+pricingModel: open-source
+disclosure: editorial
+applicationCategory: DeveloperApplication
+operatingSystem: macOS, Windows, Linux
+tags:
+  - dataframe
+  - query-engine
+  - data-engineering
+keywords:
+  - Polars
+  - DataFrames
+  - lazy execution
+  - Apache Arrow
+  - streaming analytics
+prerequisites:
+  - Language and runtime choice for the workflow, such as Python, Rust, Node.js, R, or SQLContext, plus compatible Polars version and optional dependencies for the selected features.
+  - Data-source plan for CSV, Parquet, JSON, IPC, Excel, Hive-style layouts, databases, cloud object stores, pandas, Arrow, and downstream file or database writes.
+  - Schema, dtype, null-handling, timezone, categorical, string, list, struct, and expression design for reproducible transformations across development and production datasets.
+  - Execution plan for eager versus lazy APIs, query optimization, streaming, memory use, thread use, file scans, predicate pushdown, projection pushdown, and result materialization.
+  - Credential and access-control plan for database connection strings, cloud URLs, `storage_options`, credential providers, service accounts, notebooks, CI jobs, and shared logs.
+safetyNotes:
+  - Polars can read from and write to local files, databases, and cloud object stores, so file paths, cloud URLs, SQL queries, and output destinations should be validated before automation runs.
+  - Lazy query optimization can change when data is read and which columns or predicates are pushed into scans, so teams should inspect plans for important production jobs and test schema assumptions.
+  - Database reads and writes depend on external engines such as ConnectorX, ADBC, SQLAlchemy, and database drivers; connection strings and permissions should be scoped to the minimum needed tables and operations.
+  - Cloud storage workflows can use automatic credential discovery, explicit `storage_options`, credential provider classes, or custom credential provider functions, all of which need secret-handling review.
+  - User-defined Python functions run custom code in the calling process and are treated by the docs as black-box operations with performance and memory costs, so only trusted functions should be used.
+  - Streaming can reduce memory pressure, but the docs note that unsupported operations may fall back to the in-memory engine, so large jobs still need memory, timeout, and fallback planning.
+privacyNotes:
+  - Polars workflows can process local files, data frames, schemas, query plans, SQL strings, database rows, cloud object paths, credentials, notebooks, generated files, and result previews.
+  - Database examples use connection strings that may contain usernames, passwords, hostnames, ports, and database names; those values should stay out of committed notebooks, CI logs, screenshots, and shared traces.
+  - Cloud I/O can expose bucket names, object keys, account identifiers, request metadata, storage options, temporary credentials, and data contents to configured object stores and cloud logs.
+  - The `polars.show_versions()` helper prints the Polars version and optional dependency versions, which can be useful for support but may also disclose runtime and package-environment details.
+  - Polars Cloud, distributed execution, notebooks, warehouses, object stores, BI tools, and orchestration systems have separate privacy, retention, billing, and access-control responsibilities outside the open-source library.
+---
+
+## Editorial notes
+
+Polars is useful when Claude-adjacent teams need fast, repeatable data wrangling over local files, model-evaluation outputs, logs, notebook datasets, tabular extracts, feature-engineering inputs, and analytical pipelines. Its lazy API, query optimizer, streaming execution, expression system, and Arrow-oriented interoperability make it a strong fit for agents that need to inspect, transform, validate, and summarize structured data without standing up a separate database service.
+
+This is distinct from DuckDB, dbt Core, Apache Airflow, and Dagster. DuckDB is an embedded analytical SQL database. dbt Core structures warehouse transformations. Airflow schedules DAGs. Dagster orchestrates data assets and operational metadata. Polars is a DataFrame query engine and library for local and programmatic tabular analytics across files, data frames, databases, object stores, SQLContext, and language front ends.
+
+## Source notes
+
+- The official repository describes Polars as an extremely fast query engine for DataFrames written in Rust.
+- The README lists lazy and eager execution, streaming for larger-than-RAM datasets, query optimization, multi-threading, SIMD, the expression API, Python, Rust, Node.js, R, SQL front ends, and Apache Arrow columnar format support.
+- The README says Polars can process parts of larger-than-RAM queries in streaming fashion and documents `collect(engine='streaming')`.
+- The README links Python, Rust, Node.js, R, and user-guide documentation, and says optional dependencies can be inspected with `pl.show_versions()`.
+- The installation docs cover the user-guide installation path and optional dependency areas such as Python, GPU, interoperability, cloud, and other I/O.
+- The lazy API docs say lazy execution lets Polars process a full query end to end, apply automatic query optimization, work with larger-than-memory datasets using streaming, and catch schema errors before processing data.
+- The streaming docs say streaming executes queries in batches for datasets that do not fit in memory, while some operations are non-streaming or may fall back to the in-memory engine.
+- The I/O docs cover CSV, Excel, Parquet, JSON, Hive, databases, and cloud storage.
+- The cloud storage docs say Polars can read and write AWS S3, Azure Blob Storage, and Google Cloud Storage, with additional dependencies, cloud retry configuration, `storage_options`, credential provider utilities, custom credential provider functions, and default credential providers.
+- The database docs describe `pl.read_database_uri`, `pl.read_database`, database connection strings, SQLAlchemy or DBAPI2 connections, ConnectorX, ADBC, and `pl.write_database`.
+- The SQL docs say Polars translates SQL queries into expressions and uses `SQLContext` to manage registered DataFrames and LazyFrames.
+- The user-defined Python function docs describe `map_elements`, `map_batches`, return dtypes, performance overhead, memory costs, and custom Python functions as black boxes to Polars.
+- The repository is `pola-rs/polars`, is MIT licensed, and is active.
+
+## Duplicate check
+
+Checked current `content/tools/`, `content/mcp/`, agents, hooks, rules, skills, commands, guides, collections, open pull requests, live issue state, and repository-wide content for `Polars`, `pola-rs/polars`, `github.com/pola-rs/polars`, `docs.pola.rs`, `pola.rs`, `DataFrames`, `lazy execution`, and `Apache Arrow`. Existing mentions appear only as contextual references inside Python data-science rules and other tool integration notes; no dedicated Polars tools entry, source URL duplicate, target file, issue duplicate, or open duplicate PR was found.
+
+## Disclosure
+
+Editorial listing. No paid placement or affiliate link is used. Polars is MIT-licensed open-source software; Polars Cloud, Polars On-Prem, object stores, databases, notebooks, orchestration tools, BI tools, optional dependencies, and downstream services may have separate licenses, billing, terms, privacy obligations, and access controls.
