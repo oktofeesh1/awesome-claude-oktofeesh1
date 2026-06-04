@@ -1,0 +1,344 @@
+---
+title: MCP Config Privacy Scanner Hook for Claude Code
+slug: mcp-config-privacy-scanner-hook
+category: hooks
+description: >-
+  Read-only Claude Code PostToolUse hook that scans edited MCP and Claude Code
+  JSON configuration files for literal credentials, authorization headers,
+  secret-bearing URLs, and overly broad local filesystem exposure before the
+  assistant continues.
+cardDescription: >-
+  Scan MCP config edits for literal secrets, auth headers, tokenized URLs, and
+  broad local path exposure without rewriting files or calling the network.
+seoTitle: MCP Config Privacy Scanner Hook for Claude Code
+seoDescription: >-
+  Source-backed Claude Code hook for reviewing MCP server configuration privacy
+  after Write, Edit, and MultiEdit operations, with jq-based JSON scanning,
+  secret placeholder handling, filesystem-scope warnings, and explicit
+  privacy notes for MCP credentials and local paths.
+author: Anthropic
+authorProfileUrl: "https://docs.anthropic.com/en/docs/claude-code/hooks"
+submittedBy: oktofeesh1
+submittedByUrl: "https://github.com/oktofeesh1"
+dateAdded: "2026-06-04"
+submittedAt: "2026-06-04"
+websiteUrl: "https://docs.anthropic.com/en/docs/claude-code/mcp"
+documentationUrl: "https://docs.anthropic.com/en/docs/claude-code/hooks"
+brandName: Claude Code
+brandDomain: anthropic.com
+brandAssetSource: manual
+brandVerifiedAt: "2026-06-04"
+installable: true
+installCommand: "mkdir -p .claude/hooks && touch .claude/hooks/mcp-config-privacy-scanner.sh && chmod +x .claude/hooks/mcp-config-privacy-scanner.sh"
+usageSnippet: >-
+  Save the script as `.claude/hooks/mcp-config-privacy-scanner.sh`, then
+  configure it as a PostToolUse hook for Write, Edit, and MultiEdit so MCP
+  config edits are reviewed before Claude continues.
+copySnippet: |-
+  {
+    "hooks": {
+      "PostToolUse": [
+        {
+          "matcher": "Write|Edit|MultiEdit",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "./.claude/hooks/mcp-config-privacy-scanner.sh"
+            }
+          ]
+        }
+      ]
+    }
+  }
+configSnippet: |-
+  {
+    "hooks": {
+      "PostToolUse": [
+        {
+          "matcher": "Write|Edit|MultiEdit",
+          "hooks": [
+            {
+              "type": "command",
+              "command": "./.claude/hooks/mcp-config-privacy-scanner.sh"
+            }
+          ]
+        }
+      ]
+    }
+  }
+scriptLanguage: bash
+scriptBody: |-
+  #!/usr/bin/env bash
+  set -uo pipefail
+
+  input="$(cat)"
+
+  if ! command -v jq >/dev/null 2>&1; then
+    echo "MCP config privacy scanner skipped: jq is required to parse hook input and JSON config." >&2
+    exit 0
+  fi
+
+  tool_name="$(printf '%s' "$input" | jq -r '.tool_name // .toolName // empty')"
+  file_path="$(printf '%s' "$input" | jq -r '.tool_input.file_path // .tool_input.path // .toolInput.file_path // .toolInput.path // empty')"
+
+  case "$tool_name" in
+    Write|Edit|MultiEdit|write|edit|multiedit) ;;
+    *) exit 0 ;;
+  esac
+
+  if [ -z "$file_path" ] || [ ! -f "$file_path" ] || [ ! -r "$file_path" ]; then
+    exit 0
+  fi
+
+  case "$file_path" in
+    .mcp.json|*/.mcp.json|mcp.json|*/mcp.json|.claude/settings.json|*/.claude/settings.json|.claude/settings.local.json|*/.claude/settings.local.json|*claude_desktop_config.json|*managed-mcp.json|*managed-settings.json)
+      ;;
+    *)
+      if ! jq -e 'has("mcpServers") or (.mcpServers? != null)' "$file_path" >/dev/null 2>&1; then
+        exit 0
+      fi
+      ;;
+  esac
+
+  if ! jq -e . "$file_path" >/dev/null 2>&1; then
+    echo "MCP config privacy scanner skipped: edited MCP-related JSON is not parseable yet." >&2
+    exit 0
+  fi
+
+  display_file="$(basename "$file_path")"
+  findings=0
+  warnings=0
+
+  is_placeholder() {
+    value="$1"
+    case "$value" in
+      ""|"null"|"<"*">"|"REDACTED"|"redacted"|"CHANGE_ME"|"change_me"|"your-"*|"YOUR_"*|"example"|"EXAMPLE")
+        return 0
+        ;;
+    esac
+    printf '%s' "$value" | grep -Eq '^((Bearer|Basic|Token)[[:space:]]+)?\$\{?[A-Za-z_][A-Za-z0-9_]*(:[-=][^}]*)?\}?$'
+  }
+
+  report_high() {
+    findings=$((findings + 1))
+    echo "MCP config privacy scanner: likely literal secret at JSON path '$1' in $display_file." >&2
+  }
+
+  report_warn() {
+    warnings=$((warnings + 1))
+    echo "MCP config privacy scanner: review privacy-sensitive JSON path '$1' in $display_file." >&2
+  }
+
+  while IFS="$(printf '\t')" read -r json_path json_value; do
+    path_lc="$(printf '%s' "$json_path" | tr '[:upper:]' '[:lower:]')"
+    value_trim="$(printf '%s' "$json_value" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+
+    if printf '%s' "$path_lc" | grep -Eq '(authorization|x-api-key|api[_-]?key|access[_-]?token|refresh[_-]?token|secret|password|passwd|private[_-]?key|session|cookie)'; then
+      if [ "${#value_trim}" -ge 8 ] && ! is_placeholder "$value_trim"; then
+        report_high "$json_path"
+      fi
+    fi
+
+    if printf '%s' "$value_trim" | grep -Eqi 'https?://[^[:space:]]+[?&](access_token|api[_-]?key|token|client_secret|password)='; then
+      report_high "$json_path"
+    fi
+
+    if printf '%s' "$path_lc" | grep -Eq '(^|\.)(args|roots|directories|alloweddirectories)(\.|$)'; then
+      if printf '%s' "$value_trim" | grep -Eq '^(~/?|\$HOME/?|\$\{HOME\}/?|/|/Users/?|/home/?|/var/?|/etc/?)$|(\.ssh|\.aws|\.kube|\.config|Desktop|Documents|Downloads|Library/Application Support)'; then
+        report_warn "$json_path"
+      fi
+    fi
+  done < <(jq -r 'paths(scalars) as $p | [($p | map(tostring) | join(".")), (getpath($p) | tostring)] | @tsv' "$file_path")
+
+  if [ "$findings" -gt 0 ]; then
+    echo "MCP config privacy scanner blocked this config edit. Move secrets to environment variables or credential helpers, then rerun." >&2
+    exit 1
+  fi
+
+  if [ "$warnings" -gt 0 ]; then
+    echo "MCP config privacy scanner found path-scope warnings. Set MCP_CONFIG_PRIVACY_STRICT=true to block on warnings." >&2
+    if [ "${MCP_CONFIG_PRIVACY_STRICT:-false}" = "true" ]; then
+      exit 1
+    fi
+  fi
+
+  exit 0
+trigger: PostToolUse
+prerequisites:
+  - "Claude Code project where hooks are allowed by user, project, or managed policy."
+  - "`jq` installed locally and available on `PATH` in the same environment that runs Claude Code hooks."
+  - "A reviewed hook configuration in `.claude/settings.json`, `.claude/settings.local.json`, user settings, or managed settings."
+  - "MCP configuration stored in JSON, such as `.mcp.json`, Claude Code settings, user JSON config, managed MCP config, or JSON passed through documented MCP configuration workflows."
+  - "Team agreement on whether broad filesystem path warnings should be advisory or blocking through `MCP_CONFIG_PRIVACY_STRICT=true`."
+safetyNotes:
+  - "This hook runs after Write, Edit, or MultiEdit. It reads the edited JSON file and hook input from stdin, then exits before Claude continues when likely literal credentials are detected."
+  - "The hook does not install packages, call remote services, execute MCP servers, rewrite configuration files, invoke `claude mcp`, or inspect files outside the edited config file."
+  - "It blocks likely literal secrets in paths such as `env`, `headers`, authorization fields, token fields, password fields, cookie fields, and secret-bearing URLs. It treats shell-style environment placeholders as acceptable."
+  - "It warns on broad filesystem exposure patterns in MCP args, roots, or directory fields, including home, root, SSH, cloud credential, Kubernetes, Desktop, Downloads, and application-support style paths."
+  - "The scanner is intentionally conservative. It can miss obfuscated secrets, custom credential field names, encrypted blobs, generated include files, non-JSON config, or secrets assembled by server commands."
+  - "A non-zero exit can interrupt the Claude Code workflow. Review findings before retrying, and keep a manual escape hatch for intentionally local-only demo configs."
+  - "Use this with MCP server trust review, permission rules, project `.gitignore`, secret scanning, and human review; it is not a complete MCP security audit."
+privacyNotes:
+  - "MCP configs can expose API keys, OAuth tokens, authorization headers, cookies, database URLs, local usernames, repository paths, home directories, SSH key paths, cloud credential locations, Kubernetes config paths, and tool-specific account identifiers."
+  - "The hook avoids printing secret values and reports JSON paths instead, but hook output can still reveal config structure, file names, and whether sensitive fields exist."
+  - "Hook output may be retained in Claude Code logs, terminal scrollback, screenshots, support tickets, issue comments, or AI transcripts."
+  - "Do not paste real MCP configs, authentication headers, tokenized URLs, local absolute paths, or customer server names into public issues, PR bodies, prompts, or examples."
+  - "Prefer environment variables, credential helpers, managed secrets, scoped OAuth flows, least-privilege service accounts, and narrow filesystem roots for real MCP servers."
+sourceUrls:
+  - "https://docs.anthropic.com/en/docs/claude-code/hooks"
+  - "https://docs.anthropic.com/en/docs/claude-code/settings"
+  - "https://docs.anthropic.com/en/docs/claude-code/mcp"
+  - "https://modelcontextprotocol.io/docs/tutorials/security/security_best_practices"
+tags:
+  - mcp
+  - privacy
+  - claude-code
+  - hooks
+  - security
+keywords:
+  - "MCP config privacy scanner"
+  - "Claude Code MCP hook"
+  - "MCP secret scanning hook"
+  - "MCP config hook"
+  - "Claude Code PostToolUse hook"
+  - "MCP filesystem privacy"
+readingTime: 7
+difficultyScore: 62
+hasTroubleshooting: true
+hasPrerequisites: true
+hasBreakingChanges: false
+robotsIndex: true
+robotsFollow: true
+---
+
+## Overview
+
+This hook reviews MCP-related JSON configuration after Claude Code writes or
+edits it. It is designed for the point where MCP server setup usually becomes
+risky: adding headers, env values, URLs, stdio args, roots, and filesystem
+paths that may leak credentials or expose more local data than intended.
+
+The hook is read-only. It parses the edited JSON file, reports only JSON paths,
+and blocks when it sees likely literal secrets. Filesystem scope findings are
+warnings by default and become blocking when `MCP_CONFIG_PRIVACY_STRICT=true`
+is set.
+
+## Source Review
+
+- https://docs.anthropic.com/en/docs/claude-code/hooks
+- https://docs.anthropic.com/en/docs/claude-code/settings
+- https://docs.anthropic.com/en/docs/claude-code/mcp
+- https://modelcontextprotocol.io/docs/tutorials/security/security_best_practices
+
+These sources were reviewed on **2026-06-04**. The Claude Code hooks reference
+documents lifecycle events, JSON stdin for command hooks, matcher behavior,
+hook settings locations, and exit-code control. The Claude Code settings and
+MCP references document user, project, local, and managed config scopes,
+`.mcp.json`, user JSON config, MCP server fields, remote transports, headers,
+env values, and local stdio servers. The MCP security best-practices guide
+documents security risks and mitigation expectations for MCP implementations.
+
+## What It Scans
+
+- `.mcp.json`, `mcp.json`, Claude Code settings JSON, managed MCP JSON, managed
+  settings JSON, and JSON files that contain `mcpServers`.
+- Secret-like JSON paths such as authorization headers, API keys, access
+  tokens, refresh tokens, cookies, passwords, private keys, and session values.
+- URLs that carry `access_token`, `api_key`, `token`, `client_secret`, or
+  `password` query parameters.
+- MCP args, roots, allowed directories, and directory-like fields that point at
+  very broad or sensitive local locations.
+
+## Installation
+
+1. Confirm `jq` is installed in the environment where Claude Code runs hooks.
+2. Save the script as `.claude/hooks/mcp-config-privacy-scanner.sh`.
+3. Mark it executable.
+4. Add the PostToolUse configuration from this entry to project, local, user, or
+   managed Claude Code settings.
+5. Edit a test `.mcp.json` with a placeholder such as `${API_TOKEN}` and verify
+   that the hook stays quiet.
+6. Edit a disposable test config with a fake literal token and verify that the
+   hook blocks without printing the token value.
+
+## Behavior
+
+The hook exits `0` when there is nothing to report, when the edited file is not
+an MCP-related JSON config, or when secret fields use environment placeholders.
+It exits `1` when a likely literal credential or tokenized URL is found.
+
+Filesystem path findings are advisory by default because some local MCP servers
+legitimately need controlled filesystem access. Set
+`MCP_CONFIG_PRIVACY_STRICT=true` when your team wants those warnings to block
+the Claude Code turn.
+
+## Configuration
+
+Use this PostToolUse configuration after reviewing the script:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./.claude/hooks/mcp-config-privacy-scanner.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+## Review Checklist
+
+- Prefer `${ENV_VAR}` placeholders over committed literal credentials.
+- Use remote MCP OAuth or credential-helper flows when the server supports them.
+- Keep local stdio servers scoped to the narrowest project directory that can
+  support the task.
+- Avoid exposing home, root, SSH, cloud credential, Kubernetes, Desktop,
+  Downloads, and broad application-support paths unless there is a reviewed
+  reason.
+- Confirm `.mcp.json`, local Claude Code config, and generated config backups
+  are handled by the repository's `.gitignore` and secret-scanning policy.
+- Review MCP server trust separately. A config can be free of literal secrets
+  and still connect Claude to an untrusted server.
+
+## Troubleshooting
+
+**Hook does not run after editing `.mcp.json`:** Confirm the hook is configured
+under `PostToolUse`, the matcher includes `Write|Edit|MultiEdit`, the script is
+executable, and Claude Code is loading the settings scope where the hook was
+added.
+
+**Hook says `jq` is missing:** Install `jq` through your system package manager
+or make sure the hook environment has the same `PATH` as your shell.
+
+**A placeholder still blocks:** Use simple shell-style placeholders such as
+`${GITHUB_TOKEN}`, `$GITHUB_TOKEN`, or `${TOKEN:-}` rather than embedding a
+fallback literal secret in the config.
+
+**A broad path warning is intentional:** Keep the warning as a human review
+signal, or unset `MCP_CONFIG_PRIVACY_STRICT` so warnings do not block. Document
+why the server needs that scope before committing shared config.
+
+## Duplicate Check
+
+Current HeyClaude content already includes broad secret scanners, environment
+variable validators, permission and MCP integration guidance, and individual
+MCP server entries. This entry is scoped specifically to MCP and Claude Code
+JSON configuration privacy after file edits. It is not a generic pre-write
+secret scanner, not a full MCP security-hardening skill, not an MCP server
+listing, and not registry policy code.
+
+## Editorial Disclosure
+
+This is a community-submitted, source-backed hook entry authored for the
+HeyClaude directory. It is not an official Anthropic package, does not ship as a
+HeyClaude download, and does not verify every possible MCP secret or trust risk.
+Use the official Claude Code and MCP documentation as the source of truth for
+current config fields, hook behavior, and security guidance.
