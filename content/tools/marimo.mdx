@@ -1,0 +1,83 @@
+---
+title: Marimo
+slug: marimo
+category: tools
+description: Apache-2.0 reactive Python notebook stored as pure Python for reproducible experiments, SQL-backed data workflows, script execution, app deployment, and AI-assisted editing.
+cardDescription: Build reactive Python notebooks that run as scripts, apps, and git-friendly data workflows.
+seoTitle: Marimo reactive Python notebook
+seoDescription: Marimo is an Apache-2.0 reactive Python notebook stored as pure Python for reproducible experiments, SQL-backed data workflows, script execution, app deployment, and AI-assisted editing.
+author: Marimo Team
+submittedBy: oktofeesh1
+submittedByUrl: "https://github.com/oktofeesh1"
+dateAdded: "2026-06-04"
+websiteUrl: "https://marimo.io/"
+documentationUrl: "https://docs.marimo.io/getting_started/"
+repoUrl: "https://github.com/marimo-team/marimo"
+pricingModel: open-source
+disclosure: editorial
+applicationCategory: DeveloperApplication
+operatingSystem: macOS, Windows, Linux
+tags:
+  - notebooks
+  - data-apps
+  - python
+keywords:
+  - Marimo
+  - reactive notebooks
+  - Python notebooks
+  - SQL cells
+  - data apps
+prerequisites:
+  - Python environment and package-management plan for the selected notebook, app, script, SQL, visualization, and optional AI features.
+  - Notebook execution model for reactive dependency graphs, deterministic cell ordering, lazy or stale runtime behavior, disabled cells, startup autorun, and side-effectful cells.
+  - Data access plan for local files, DataFrames, SQL cells, databases, warehouses, cloud object storage, remote filesystems, environment variables, and credentials.
+  - Deployment and access-control plan for edit servers, read-only apps, token or password protection, reverse proxies, ASGI middleware, public sharing, rate limits, and error reporting.
+  - AI provider configuration if using built-in assistant features, inline completion, Copilot-style integrations, local models, marimo pair, or agent CLI workflows.
+safetyNotes:
+  - Marimo notebooks execute Python and SQL, can write files, query databases, call APIs, access object storage, install packages, and start web servers, so notebooks should be treated as trusted project code.
+  - Reactive execution automatically tracks variable dependencies and can run downstream cells after upstream changes; expensive, destructive, or side-effectful cells need lazy runtime, disabled cells, startup autorun, and manual-run policies.
+  - The docs note that Marimo tracks variable definitions and references statically, not arbitrary mutations across cells, so mutable shared state should be designed carefully to avoid misleading results.
+  - App mode uses `marimo run` to serve notebooks as web apps with code hidden by default, but public deployments still need authentication, authorization, rate limiting, reverse proxy policy, and traceback disclosure review.
+  - Disabling token protection, passing access tokens in URLs, or exposing edit servers can give unauthorized users access to notebook execution and should be avoided outside controlled environments.
+  - SQL cells can interpolate Python values, query local files and remote databases, and use engines or extensions such as DuckDB, so SQL strings, credentials, object paths, and output destinations should be reviewed before automation.
+  - Built-in AI and copilot features may inspect notebook code, prompts, tool context, and referenced variable values; provider selection, API keys, local model behavior, and cost controls should be configured deliberately.
+  - Package-management features can serialize requirements and auto-install dependencies into notebook-specific environments, so teams should pin, review, and scan packages before sharing or deploying notebooks.
+privacyNotes:
+  - Marimo workflows can process notebook source code, cell outputs, variable values, DataFrames, SQL queries, schemas, database rows, object-store paths, generated apps, CLI arguments, logs, and exported artifacts.
+  - User configuration can store runtime, server, completion, and AI-provider settings, while app configuration can live inside notebook files; secrets should stay in environment variables or secret stores rather than committed notebooks.
+  - AI-assisted editing can send prompts, notebook context, code, schemas, and referenced in-memory values to configured hosted providers, or to local model services when those are selected.
+  - Database and remote-storage workflows can expose connection strings, credentials, table names, bucket names, object keys, query text, sample rows, and download paths to notebooks, logs, cloud services, and deployed apps.
+  - Token login, query-parameter access tokens, Basic auth headers, reverse-proxy headers, and server logs should be handled as sensitive operational data.
+---
+
+## Editorial notes
+
+Marimo is useful when Claude-adjacent teams need reproducible Python notebooks that can move between exploratory analysis, reviewable source code, scheduled scripts, SQL-backed data work, and deployable apps. Because notebooks are stored as pure Python, they are easier for agents and reviewers to diff, search, refactor, test, and version-control than hidden-state notebook formats.
+
+This entry covers the open-source Marimo notebook project. It is distinct from Jupyter, Streamlit, Chainlit, DuckDB, and Polars. Jupyter is the traditional interactive notebook environment. Streamlit and Chainlit primarily focus on app or chat interfaces. DuckDB is an embedded analytical database. Polars is a DataFrame query engine. Marimo focuses on reactive, reproducible Python notebooks that can also run as scripts and apps.
+
+## Source notes
+
+- The official repository describes Marimo as a reactive Python notebook that runs reproducible experiments, queries with SQL, executes as a script, deploys as an app, versions with git, and stores notebooks as pure Python.
+- The README highlights reactive execution, interactive UI elements, git-friendly Python files, SQL support, AI-native workflows, package management, script execution, app deployment, WASM support, reusable code, and testability.
+- The README says Marimo can replace parts of Jupyter, Streamlit, Jupytext, ipywidgets, and Papermill workflows by combining notebooks, apps, scripts, and automation-oriented execution.
+- The reactivity docs say Marimo builds a dependency graph from variable definitions and references, automatically marks dependent cells for execution, eliminates hidden state, and supports lazy runtime behavior for expensive notebooks.
+- The reactivity docs also note that Marimo does not track variable mutations across cells and that global variable names must be unique.
+- The app docs say `marimo run` starts a web server and runs a notebook as an app, with notebook code hidden by default in app view.
+- The deployment docs distinguish edit servers for creating, running, and editing notebooks from app servers for read-only web apps, and cover public sharing, authentication, health endpoints, and traceback handling.
+- The authentication docs describe token and password protection, note that there is no built-in authorization system, and suggest ASGI middleware for custom authentication.
+- The SQL docs say Marimo SQL cells can query Python DataFrames, files, and databases, interpolate Python values, use the built-in SQL engine, and return results as DataFrames or DuckDB relations.
+- The database docs under SQL describe connections for PostgreSQL, MySQL, SQLite, DuckDB, Snowflake, BigQuery, SQLAlchemy, SQLModel, and other database engines.
+- The remote-storage docs describe browsing and using storage connections through `fsspec`, including S3, Google Cloud Storage, and Azure storage examples.
+- The package-management docs and README describe serializing notebook requirements and auto-installing dependencies in isolated environments.
+- The AI completion docs describe full-cell generation, inline completion, assistant context, referenced variable values, hosted providers, local Ollama models, GitHub Copilot, Windsurf, and custom copilot integrations.
+- The LLM provider configuration docs cover OpenAI, Anthropic, Google AI, OpenAI-compatible endpoints, Ollama, Bedrock, Azure, OpenRouter, and other provider settings.
+- The repository is `marimo-team/marimo`, is Apache-2.0 licensed, active, and maintained by the Marimo team.
+
+## Duplicate check
+
+Checked current `content/tools/`, `content/mcp/`, agents, hooks, rules, skills, commands, guides, collections, open pull requests, live issue state, and repository-wide content for `Marimo`, `marimo-team/marimo`, `github.com/marimo-team/marimo`, `docs.marimo.io`, `marimo.io`, `reactive notebooks`, `Python notebooks`, and `SQL cells`. No dedicated Marimo tools entry, source URL duplicate, target file, issue duplicate, semantic duplicate, or open duplicate PR was found.
+
+## Disclosure
+
+Editorial listing. No paid placement or affiliate link is used. Marimo is Apache-2.0 open-source software; Marimo Cloud or Molab, hosted AI providers, local model servers, GitHub Copilot, databases, warehouses, object stores, notebooks, cloud hosts, and downstream deployment services may have separate licenses, billing, terms, privacy obligations, and access controls.
