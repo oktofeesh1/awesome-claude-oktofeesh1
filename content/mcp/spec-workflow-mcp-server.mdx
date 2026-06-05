@@ -1,0 +1,179 @@
+---
+title: Spec Workflow MCP Server
+slug: spec-workflow-mcp-server
+category: mcp
+description: >-
+  MCP server for spec-driven development workflows with requirements, design,
+  task planning, approvals, implementation logs, and a real-time dashboard.
+cardDescription: >-
+  Add structured requirements, design, tasks, approvals, and dashboard tracking
+  to AI-assisted development.
+seoTitle: Spec Workflow MCP Server for Claude
+seoDescription: >-
+  Configure Spec Workflow MCP with Claude, Codex, Cursor, VS Code, and other
+  MCP clients for spec-driven development, approvals, task tracking, and a
+  real-time dashboard.
+author: Pimzino
+authorProfileUrl: "https://github.com/Pimzino"
+submittedBy: oktofeesh1
+submittedByUrl: "https://github.com/oktofeesh1"
+dateAdded: "2026-06-05"
+brandName: Spec Workflow MCP
+repoUrl: "https://github.com/Pimzino/spec-workflow-mcp"
+documentationUrl: "https://github.com/Pimzino/spec-workflow-mcp/blob/main/docs/USER-GUIDE.md"
+packageUrl: "https://www.npmjs.com/package/@pimzino/spec-workflow-mcp"
+installable: true
+installCommand: "npx -y @pimzino/spec-workflow-mcp@latest YOUR_PROJECT_PATH"
+usageSnippet: "Run `npx -y @pimzino/spec-workflow-mcp@latest YOUR_PROJECT_PATH` in your MCP client, and run the dashboard separately with `--dashboard` when you want visual approval and progress tracking."
+copySnippet: |-
+  {
+    "mcpServers": {
+      "spec-workflow": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "@pimzino/spec-workflow-mcp@latest",
+          "YOUR_PROJECT_PATH"
+        ]
+      }
+    }
+  }
+configSnippet: |-
+  {
+    "mcpServers": {
+      "spec-workflow": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "@pimzino/spec-workflow-mcp@latest",
+          "YOUR_PROJECT_PATH"
+        ]
+      }
+    }
+  }
+estimatedSetupTime: 10 minutes
+difficulty: intermediate
+prerequisites:
+  - Node.js and npm available to the MCP client runtime.
+  - Project workspace path where `.spec-workflow` state should be created.
+  - Optional dashboard process or VS Code extension for visual review and approvals.
+  - Team agreement on approval gates before generated tasks move into implementation.
+safetyNotes:
+  - Spec Workflow MCP writes workflow state, specs, approvals, templates, archives, and implementation logs into the target project.
+  - The server can shape development tasks and approvals that agents may later execute, so review generated requirements, design decisions, and task lists before implementation.
+  - Keep the dashboard bound to local or protected network access; add TLS and authentication before exposing it beyond the development machine.
+  - Review Docker volume mounts and `SPEC_WORKFLOW_HOME` when using containers or sandboxed environments so state is written only where intended.
+privacyNotes:
+  - Requirements, designs, task lists, approval comments, implementation logs, code statistics, project paths, and dashboard events may reveal product plans, architecture, source structure, and internal decisions.
+  - Audit logs and `.spec-workflow` files should be treated as project documentation and reviewed before sharing externally.
+  - Do not paste secrets, customer data, unreleased roadmap details, or private incident context into specs unless the repository and dashboard access controls are appropriate.
+sourceUrls:
+  - "https://github.com/Pimzino/spec-workflow-mcp"
+  - "https://github.com/Pimzino/spec-workflow-mcp/blob/main/docs/USER-GUIDE.md"
+  - "https://github.com/Pimzino/spec-workflow-mcp/blob/main/docs/WORKFLOW.md"
+  - "https://github.com/Pimzino/spec-workflow-mcp/blob/main/docs/TOOLS-REFERENCE.md"
+  - "https://github.com/Pimzino/spec-workflow-mcp/blob/main/docs/CONFIGURATION.md"
+  - "https://www.npmjs.com/package/@pimzino/spec-workflow-mcp"
+tags:
+  - spec-driven-development
+  - planning
+  - approvals
+  - dashboard
+  - workflow
+keywords:
+  - Spec Workflow MCP
+  - spec-workflow-mcp
+  - spec driven development MCP
+  - AI development workflow MCP
+  - requirements design tasks MCP
+robotsIndex: true
+robotsFollow: true
+---
+
+## Content
+
+Spec Workflow MCP Server gives AI-assisted development a structured
+requirements -> design -> tasks workflow. It stores project-local spec state,
+tracks approvals and revisions, records implementation logs, and can pair with a
+real-time dashboard or VS Code extension for visual progress management.
+
+The upstream README documents client setup for Claude Code, Claude Desktop,
+Codex, Cursor, Continue, Windsurf, OpenCode, Cline, and Augment. The npm package
+is `@pimzino/spec-workflow-mcp`, and the server accepts a target project path so
+spec files can live with the project being planned.
+
+## Source Review
+
+- https://github.com/Pimzino/spec-workflow-mcp
+- https://github.com/Pimzino/spec-workflow-mcp/blob/main/docs/USER-GUIDE.md
+- https://github.com/Pimzino/spec-workflow-mcp/blob/main/docs/WORKFLOW.md
+- https://github.com/Pimzino/spec-workflow-mcp/blob/main/docs/TOOLS-REFERENCE.md
+- https://github.com/Pimzino/spec-workflow-mcp/blob/main/docs/CONFIGURATION.md
+- https://www.npmjs.com/package/@pimzino/spec-workflow-mcp
+
+These sources were reviewed on **2026-06-05**. Prefer the live repository and
+npm package for current client snippets, dashboard behavior, security controls,
+configuration flags, and tool definitions.
+
+## Features
+
+- Sequential spec workflow for requirements, design, and implementation tasks.
+- Approval process with feedback and revisions.
+- Real-time web dashboard for specs, task progress, and workflow status.
+- VS Code extension for integrated dashboard access.
+- Implementation logs with searchable history and code statistics.
+- Multi-language documentation and interface support.
+- Docker dashboard deployment and sandbox-friendly `SPEC_WORKFLOW_HOME`
+  configuration.
+- Security controls including local binding, rate limiting, audit logging,
+  security headers, CORS restrictions, and Docker hardening.
+
+## Installation
+
+Add the MCP server to your client with the target project path:
+
+```json
+{
+  "mcpServers": {
+    "spec-workflow": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@pimzino/spec-workflow-mcp@latest",
+        "YOUR_PROJECT_PATH"
+      ]
+    }
+  }
+}
+```
+
+Run the dashboard separately with the upstream `--dashboard` option when visual
+approval and progress tracking are needed. VS Code users can also use the
+project's marketplace extension.
+
+## Use Cases
+
+- Ask Claude to create requirements, design, and task documents before coding.
+- Track approval status and revision history for AI-generated specs.
+- Use dashboard progress views to coordinate implementation work.
+- Keep task implementation logs beside the project.
+- Add a review checkpoint between broad product ideas and executable agent
+  tasks.
+
+## Safety and Privacy
+
+Spec Workflow MCP can influence what an agent builds next. Treat generated
+requirements, design docs, and tasks as proposals until reviewed by a person.
+When the dashboard is used outside a local development machine, protect it with
+TLS, authentication, and network restrictions.
+
+Spec files, approval comments, logs, templates, code statistics, and project
+paths can reveal sensitive roadmap or architecture details. Review `.spec-workflow`
+contents before sharing a repository or attaching logs to public issues.
+
+## Duplicate Check
+
+No `Pimzino/spec-workflow-mcp` entry, `@pimzino/spec-workflow-mcp` package
+entry, or matching source URL was found in `content/mcp`. This is distinct from
+general coding-agent entries because it focuses on an MCP-backed spec workflow
+and dashboard rather than an agent persona or generic task runner.
