@@ -160,6 +160,20 @@ describe("brand asset helpers", () => {
     });
     expect(
       buildBrandAssetMetadata({
+        title: "Rejected Brand Asset",
+        brandDomain: "example.com",
+        brandIconUrl: "https://evil.example/icon.png",
+        brandLogoUrl: "javascript:alert(1)",
+        brandAssetSource: "brandfetch",
+      }),
+    ).toMatchObject({
+      brandDomain: "example.com",
+      brandIconUrl: undefined,
+      brandLogoUrl: undefined,
+      brandAssetSource: undefined,
+    });
+    expect(
+      buildBrandAssetMetadata({
         title: "GitHub Copilot Advisor",
         brandDomain: "github.com",
       }),

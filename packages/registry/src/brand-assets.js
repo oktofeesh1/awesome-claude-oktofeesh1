@@ -401,6 +401,10 @@ export function buildBrandAssetMetadata(data = {}, options = {}) {
         })
       : "");
   const brandLogoUrl = clean(data.brandLogoUrl);
+  const safeBrandIconUrl =
+    brandIconUrl && isAllowedBrandAssetUrl(brandIconUrl) ? brandIconUrl : "";
+  const safeBrandLogoUrl =
+    brandLogoUrl && isAllowedBrandAssetUrl(brandLogoUrl) ? brandLogoUrl : "";
   const brandColors = normalizeBrandColors(data.brandColors);
   const hasBrandMetadata = Boolean(
     brandName ||
@@ -417,18 +421,12 @@ export function buildBrandAssetMetadata(data = {}, options = {}) {
   return {
     brandName: brandName || undefined,
     brandDomain: brandDomain || undefined,
-    brandIconUrl:
-      brandIconUrl && isAllowedBrandAssetUrl(brandIconUrl)
-        ? brandIconUrl
-        : undefined,
-    brandLogoUrl:
-      brandLogoUrl && isAllowedBrandAssetUrl(brandLogoUrl)
-        ? brandLogoUrl
-        : undefined,
+    brandIconUrl: safeBrandIconUrl || undefined,
+    brandLogoUrl: safeBrandLogoUrl || undefined,
     brandAssetSource:
       source &&
       BRAND_ASSET_SOURCES.includes(source) &&
-      (source !== "brandfetch" || Boolean(brandIconUrl || brandLogoUrl))
+      (source !== "brandfetch" || Boolean(safeBrandIconUrl || safeBrandLogoUrl))
         ? source
         : undefined,
     brandVerifiedAt: brandVerifiedAt || undefined,
