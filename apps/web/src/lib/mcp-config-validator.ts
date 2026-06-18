@@ -266,7 +266,14 @@ function firstPackageOperand(args: string[]) {
 }
 
 function commandName(command: string) {
-  return command.trim().split(/[\\/]/).pop()?.toLowerCase() || "";
+  const base =
+    command
+      .trim()
+      .split(/[\\/]/)
+      .pop()
+      ?.replace(/^["']|["']$/g, "")
+      .toLowerCase() || "";
+  return base.replace(/\.(?:bat|cmd|com|exe|ps1)$/i, "");
 }
 
 function packageRunnerName(command: string, args: string[]) {

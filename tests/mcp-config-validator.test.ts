@@ -449,6 +449,14 @@ describe("MCP config validator", () => {
             command: "npm",
             args: ["exec", "@scope/server@^1.2.3"],
           },
+          windowsNpx: {
+            command: "npx.cmd",
+            args: ["@example/windows-mcp"],
+          },
+          windowsUvx: {
+            command: "C:\\tools\\uvx.exe",
+            args: ["windows-python-mcp"],
+          },
           pinnedUvx: {
             command: "uvx",
             args: ["python-mcp-server@1.2.3"],
@@ -473,6 +481,12 @@ describe("MCP config validator", () => {
         ),
         expect.stringContaining(
           "rangedNpm: npm exec runs unpinned package @scope/server@^1.2.3",
+        ),
+        expect.stringContaining(
+          "windowsNpx: npx runs unpinned package @example/windows-mcp",
+        ),
+        expect.stringContaining(
+          "windowsUvx: uvx runs unpinned package windows-python-mcp",
         ),
       ]),
     );
