@@ -11,12 +11,14 @@ import {
   isHostingOrRegistryDomain,
   normalizeBrandColors,
   normalizeBrandDomain,
+  shouldAutoResolveBrandAsset,
 } from "@heyclaude/registry/brand-assets";
 
 describe("brand asset helpers", () => {
   it("normalizes domains, hosting providers, colors, and asset URLs defensively", () => {
     expect(normalizeBrandDomain("www.Example.COM/path")).toBe("example.com");
     expect(normalizeBrandDomain("https://bad..example.com")).toBe("");
+    expect(normalizeBrandDomain("localhost")).toBe("");
     expect(normalizeBrandDomain("%")).toBe("");
     expect(domainFromUrl("not a url")).toBe("");
     expect(isHostingOrRegistryDomain("docs.github.com")).toBe(true);
@@ -33,6 +35,18 @@ describe("brand asset helpers", () => {
       false,
     );
     expect(isAllowedBrandAssetUrl("not a url")).toBe(false);
+    expect(shouldAutoResolveBrandAsset("example.com")).toBe(true);
+    expect(shouldAutoResolveBrandAsset("%")).toBe(false);
+    expect(shouldAutoResolveBrandAsset("github.com", {})).toBe(false);
+    expect(
+      shouldAutoResolveBrandAsset("github.com", { title: "Community MCP" }),
+    ).toBe(false);
+    expect(
+      shouldAutoResolveBrandAsset("github.com", {
+        title: "Copilot Advisor",
+        tags: ["github"],
+      }),
+    ).toBe(true);
   });
 
   it("builds Brandfetch and proxy URLs from explicit and environment client IDs", () => {
@@ -44,6 +58,9 @@ describe("brand asset helpers", () => {
       );
       expect(brandfetchClientId()).toBe("env-client");
       expect(brandfetchLogoUrl("", { clientId: "client" })).toBe("");
+      expect(
+        brandfetchLogoUrl("Example.com", { clientId: "client" }),
+      ).toContain("/w/128/h/128/icon.png");
       const logoUrl = brandfetchLogoUrl("Example.com", {
         clientId: "client",
         width: 999,
@@ -62,6 +79,7 @@ describe("brand asset helpers", () => {
           siteUrl: "https://heyclau.de/base/",
         }),
       ).toBe("https://heyclau.de/api/brand-assets/icon/example.com");
+      expect(brandAssetProxyUrl("%", { kind: "icon" })).toBe("");
     } finally {
       vi.unstubAllEnvs();
     }
@@ -85,6 +103,17 @@ describe("brand asset helpers", () => {
       name: "Zapier",
       domain: "zapier.com",
       alias: "zapier",
+    });
+    expect(detectKnownBrand({ title: "Plain Workflow" })).toBeNull();
+
+    expect(buildBrandAssetMetadata({ title: "Plain Workflow" })).toEqual({
+      brandName: undefined,
+      brandDomain: undefined,
+      brandIconUrl: undefined,
+      brandLogoUrl: undefined,
+      brandAssetSource: undefined,
+      brandVerifiedAt: undefined,
+      brandColors: undefined,
     });
 
     expect(
@@ -116,6 +145,66 @@ describe("brand asset helpers", () => {
       ),
     ).toMatchObject({
       brandIconUrl: "/api/brand-assets/icon/zapier.com",
+      brandAssetSource: "brandfetch",
+    });
+    expect(
+      buildBrandAssetMetadata({
+        title: "Community MCP Server",
+        brandDomain: "github.com",
+      }),
+    ).toMatchObject({
+      brandName: "Community MCP Server",
+      brandDomain: "github.com",
+      brandIconUrl: undefined,
+      brandAssetSource: undefined,
+    });
+    expect(
+      buildBrandAssetMetadata({
+        title: "GitHub Copilot Advisor",
+        brandDomain: "github.com",
+      }),
+    ).toMatchObject({
+      brandDomain: "github.com",
+      brandIconUrl: "/api/brand-assets/icon/github.com",
+      brandAssetSource: "brandfetch",
+    });
+    expect(
+      buildBrandAssetMetadata({
+        title: "Reviewed Manual Brand",
+        brandDomain: "example.com",
+        brandIconUrl: "https://cdn.brandfetch.io/domain/example.com/icon.png",
+        brandLogoUrl: "https://asset.brandfetch.io/example/logo.png",
+        brandAssetSource: "manual",
+      }),
+    ).toMatchObject({
+      brandDomain: "example.com",
+      brandIconUrl: "https://cdn.brandfetch.io/domain/example.com/icon.png",
+      brandLogoUrl: "https://asset.brandfetch.io/example/logo.png",
+      brandAssetSource: "manual",
+    });
+    expect(
+      buildBrandAssetMetadata({
+        title: "Hidden Brand",
+        brandDomain: "example.com",
+        brandIconUrl: "/api/brand-assets/icon/example.com",
+        brandAssetSource: "none",
+      }),
+    ).toMatchObject({
+      brandDomain: "example.com",
+      brandIconUrl: "/api/brand-assets/icon/example.com",
+      brandAssetSource: "none",
+    });
+    expect(
+      buildBrandAssetMetadata(
+        {
+          title: "Activepieces Workflow Tool",
+          websiteUrl: "https://activepieces.com/docs",
+        },
+        { allowWebsiteFallback: true },
+      ),
+    ).toMatchObject({
+      brandDomain: "activepieces.com",
+      brandIconUrl: "/api/brand-assets/icon/activepieces.com",
       brandAssetSource: "brandfetch",
     });
   });

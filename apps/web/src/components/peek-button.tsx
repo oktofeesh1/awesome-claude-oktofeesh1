@@ -22,6 +22,7 @@ import {
 } from "./badges";
 import { SourceCitations } from "./source-citations";
 import { CopySegmented, variantsForEntry } from "./copy-segmented";
+import { EntryBrandMark } from "./entry-brand-mark";
 import { HarnessVariantPicker } from "./harness-variant-picker";
 import { useHarnessPref, useCopyPref, type CopyVariant } from "@/lib/dossier-prefs";
 import { cn } from "@/lib/utils";
@@ -105,12 +106,17 @@ function PeekBody({ entry, titleId }: { entry: Entry; titleId: string }) {
           <SourceBadge status={entry.source} />
           <InstallRiskBadge entry={entry} size="xs" />
         </div>
-        <SheetTitle id={titleId} className="font-display text-lg leading-tight text-ink">
-          {entry.title}
-        </SheetTitle>
-        <SheetDescription className="text-sm text-ink-muted">
-          {entry.cardDescription ?? entry.description}
-        </SheetDescription>
+        <div className="flex min-w-0 items-start gap-3">
+          <EntryBrandMark entry={entry} size="md" priority className="mt-0.5" />
+          <div className="min-w-0 flex-1">
+            <SheetTitle id={titleId} className="font-display text-lg leading-tight text-ink">
+              {entry.title}
+            </SheetTitle>
+            <SheetDescription className="mt-1.5 text-sm text-ink-muted">
+              {entry.cardDescription ?? entry.description}
+            </SheetDescription>
+          </div>
+        </div>
         <div className="flex flex-wrap items-center gap-2 text-xs text-ink-muted">
           <span>
             by <span className="text-ink">{entry.author}</span>

@@ -12,6 +12,7 @@ import {
   NotesPresenceChips,
 } from "./badges";
 import { CopyButton } from "./copy-button";
+import { EntryBrandMark } from "./entry-brand-mark";
 import { EntryFacets } from "./entry-facets";
 import { PeekButton, setHotPeek, clearHotPeek, type PeekHandle } from "./peek-button";
 import { PeekHint } from "./peek-hint";
@@ -99,6 +100,7 @@ function ResourceCardInner({
               {String(rank).padStart(2, "0")}
             </span>
           )}
+          <EntryBrandMark entry={entry} size="xs" />
           <CategoryPill>{entry.category}</CategoryPill>
           <span className="min-w-0 flex-1 truncate font-medium text-ink group-hover:underline">
             {entry.title}
@@ -135,7 +137,10 @@ function ResourceCardInner({
           className="flex flex-1 flex-col gap-3 p-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/60 rounded-lg"
         >
           <div className="flex items-start justify-between gap-2">
-            <CategoryPill>{entry.category}</CategoryPill>
+            <div className="flex min-w-0 items-center gap-2">
+              <EntryBrandMark entry={entry} size="xs" />
+              <CategoryPill>{entry.category}</CategoryPill>
+            </div>
             <div className="flex min-h-4 items-center text-xs text-ink-muted tabular-nums">
               <SourceRepoStars entry={entry} compact />
             </div>
@@ -211,31 +216,34 @@ function ResourceCardInner({
           "bg-accent/5 before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-accent",
       )}
     >
-      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <CategoryPill>{entry.category}</CategoryPill>
-          <TrustBadge level={entry.trust} />
-          <SourceBadge status={entry.source} />
-          <InstallRiskBadge entry={entry} size="xs" />
-          {entry.platforms.slice(0, 2).map((p) => (
-            <PlatformChip key={p} id={p} />
-          ))}
-        </div>
+      <div className="flex min-w-0 flex-1 items-start gap-3">
+        <EntryBrandMark entry={entry} size="sm" className="mt-0.5" />
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <CategoryPill>{entry.category}</CategoryPill>
+            <TrustBadge level={entry.trust} />
+            <SourceBadge status={entry.source} />
+            <InstallRiskBadge entry={entry} size="xs" />
+            {entry.platforms.slice(0, 2).map((p) => (
+              <PlatformChip key={p} id={p} />
+            ))}
+          </div>
 
-        <Link
-          to="/entry/$category/$slug"
-          params={{ category: entry.category, slug: entry.slug }}
-          className="flex items-baseline gap-2"
-        >
-          <h3 className="font-display text-[15px] font-semibold tracking-tight text-ink group-hover:underline">
-            {entry.title}
-          </h3>
-          <span className="text-xs text-ink-subtle">by {entry.author}</span>
-        </Link>
-        <p className="line-clamp-2 max-w-3xl text-sm text-ink-muted">{entry.description}</p>
-        <div className="flex flex-wrap items-center gap-2 pt-0.5">
-          <EntryFacets entry={entry} density="card" />
-          <NotesPresenceChips entry={entry} />
+          <Link
+            to="/entry/$category/$slug"
+            params={{ category: entry.category, slug: entry.slug }}
+            className="flex items-baseline gap-2"
+          >
+            <h3 className="font-display text-[15px] font-semibold tracking-tight text-ink group-hover:underline">
+              {entry.title}
+            </h3>
+            <span className="text-xs text-ink-subtle">by {entry.author}</span>
+          </Link>
+          <p className="line-clamp-2 max-w-3xl text-sm text-ink-muted">{entry.description}</p>
+          <div className="flex flex-wrap items-center gap-2 pt-0.5">
+            <EntryFacets entry={entry} density="card" />
+            <NotesPresenceChips entry={entry} />
+          </div>
         </div>
       </div>
 

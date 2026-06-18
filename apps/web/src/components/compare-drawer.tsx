@@ -16,9 +16,11 @@ import { HarnessVariantPicker } from "@/components/harness-variant-picker";
 import { TrustDrilldown } from "./trust-drilldown";
 import { CopyButton } from "./copy-button";
 import { CopySegmented, variantsForEntry } from "./copy-segmented";
+import { EntryBrandMark } from "./entry-brand-mark";
 import { useCopyPref, useHarnessPref } from "@/lib/dossier-prefs";
 import type { Entry, Harness } from "@/types/registry";
 import { cn } from "@/lib/utils";
+import { brandIdentityLabel } from "@/lib/brand-icons";
 
 interface RowDef {
   label: string;
@@ -55,6 +57,20 @@ const ROWS: RowDef[] = [
           <Lock className="h-3.5 w-3.5 opacity-50" aria-hidden /> Missing
         </span>
       ),
+  },
+  {
+    label: "Brand",
+    render: (e) => {
+      const label = brandIdentityLabel(e);
+      return label ? (
+        <span className="inline-flex items-center gap-2 text-sm text-ink">
+          <EntryBrandMark entry={e} size="sm" />
+          <span>{label}</span>
+        </span>
+      ) : (
+        <span className="text-xs text-ink-subtle">—</span>
+      );
+    },
   },
   {
     label: "Category",
@@ -275,13 +291,16 @@ export function CompareDrawer() {
                         className="min-w-[260px] max-w-[320px] border-b border-r border-border bg-surface p-3 text-left align-top last:border-r-0"
                       >
                         <div className="flex items-start justify-between gap-2">
-                          <Link
-                            to="/entry/$category/$slug"
-                            params={{ category: e.category, slug: e.slug }}
-                            className="font-display text-sm font-semibold text-ink hover:underline"
-                          >
-                            {e.title}
-                          </Link>
+                          <div className="flex min-w-0 items-start gap-2">
+                            <EntryBrandMark entry={e} size="sm" className="mt-0.5" />
+                            <Link
+                              to="/entry/$category/$slug"
+                              params={{ category: e.category, slug: e.slug }}
+                              className="min-w-0 font-display text-sm font-semibold text-ink hover:underline"
+                            >
+                              {e.title}
+                            </Link>
+                          </div>
                           <button
                             type="button"
                             onClick={() => onRemove(e)}

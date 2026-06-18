@@ -52,6 +52,7 @@ import { SourceCitations } from "@/components/source-citations";
 import { ProvenanceBlock } from "@/components/provenance-block";
 import { StickyMetaBar } from "@/components/sticky-meta-bar";
 import { EntrySignalsPanel } from "@/components/entry-signals-panel";
+import { EntryBrandMark } from "@/components/entry-brand-mark";
 import { TRUST_LABEL, PLATFORM_SUPPORT_LABEL, type Entry } from "@/types/registry";
 import { installRiskLevel, INSTALL_RISK_LABEL, INSTALL_RISK_DETAIL } from "@/lib/trust";
 import { useEffect, useMemo, useState } from "react";
@@ -329,7 +330,10 @@ function Dossier() {
             />
           </div>
 
-          <h1 className="mt-4 h-display-1 text-ink text-balance">{entry.title}</h1>
+          <div className="mt-4 flex min-w-0 items-start gap-4">
+            <EntryBrandMark entry={entry} size="lg" priority className="mt-1" />
+            <h1 className="min-w-0 flex-1 h-display-1 text-ink text-balance">{entry.title}</h1>
+          </div>
           <p className="mt-4 max-w-2xl text-pretty text-base text-ink-muted sm:text-lg">
             {entry.description}
           </p>
