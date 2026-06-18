@@ -2354,6 +2354,7 @@ async function enqueueReviewTarget(
   eventName: string,
   webhook?: Record<string, unknown>,
   forceRecheck = false,
+  trustedManualRecheck = false,
 ) {
   if (target.baseRef !== contentGateBaseRef(env)) return false;
   const targetKey = targetKeyForReview(target);
@@ -2373,7 +2374,8 @@ async function enqueueReviewTarget(
       isReopenedPullRequestEvent(eventName, webhook) ||
       eventName === "scheduled");
   const shouldResetManualTerminal =
-    forceRecheck === true && String(existing?.status || "") === "manual";
+    trustedManualRecheck === true &&
+    String(existing?.status || "") === "manual";
   const shouldQueueReview =
     !hasTerminalGateDecision(existing) ||
     shouldResetIgnoredScan ||
@@ -2414,7 +2416,14 @@ async function enqueueReviewTarget(
   await env.SUBMISSION_REVIEW_QUEUE.send({
     kind: "review_pr",
     targetKey,
-    payload: { eventName, deliveryId, target, webhook, forceRecheck },
+    payload: {
+      eventName,
+      deliveryId,
+      target,
+      webhook,
+      forceRecheck,
+      trustedManualRecheck,
+    },
   });
   return true;
 }
@@ -2727,6 +2736,7 @@ async function githubWebhookRoute(
       eventName,
       payload,
       true,
+      true,
     );
     const targetKey = targetKeyForReview(target);
     return json({ ok: true, queued: true, targetKey });
@@ -3033,6 +3043,9 @@ async function handleReviewMessage(env: Env, message: QueueMessage) {
       const forceRecheck =
         message.payload.forceRecheck === true ||
         String(message.payload.eventName || "") === "issue_comment";
+      const trustedManualRecheck =
+        message.payload.trustedManualRecheck === true ||
+        String(message.payload.eventName || "") === "issue_comment";
       const existing = await getPrState(env.SUBMISSION_GATE_DB, {
         repo: target.repoFullName,
         number: target.number,
@@ -3078,7 +3091,7 @@ async function handleReviewMessage(env: Env, message: QueueMessage) {
             return;
           }
           const existingStatus = String(existing?.status || "");
-          if (existingStatus === "manual" && !forceRecheck) {
+          if (existingStatus === "manual" && !trustedManualRecheck) {
             await insertAudit(env.SUBMISSION_GATE_DB, {
               id: crypto.randomUUID(),
               targetKey: message.targetKey,
