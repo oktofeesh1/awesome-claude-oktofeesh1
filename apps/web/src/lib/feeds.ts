@@ -10,6 +10,7 @@
 import { ENTRIES } from "@/data/entries";
 import { CHANGELOG, RELEASE_NOTES } from "@/data/changelog";
 import { getGrowthSurfaces } from "@/lib/growth-surfaces";
+import { ifNoneMatchMatches } from "@/lib/http-cache";
 import { CATEGORIES, type Category } from "@/types/registry";
 
 export const SITE_NAME = "HeyClaude";
@@ -143,14 +144,13 @@ export async function respondFeed(
   contentType = "application/rss+xml; charset=utf-8",
 ): Promise<Response> {
   const etag = await etagFor(body);
-  const ifNoneMatch = request.headers.get("if-none-match");
   const headers: Record<string, string> = {
     "Content-Type": contentType,
     "Cache-Control": XML_CACHE,
     ETag: etag,
     "Last-Modified": new Date(lastBuilt).toUTCString(),
   };
-  if (ifNoneMatch && ifNoneMatch === etag) {
+  if (ifNoneMatchMatches(request.headers.get("if-none-match"), etag)) {
     return new Response(null, { status: 304, headers });
   }
   return new Response(body, { headers });
