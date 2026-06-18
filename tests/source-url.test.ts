@@ -42,6 +42,14 @@ describe("source URL canonicalization", () => {
         "https://www.Example.com/docs/?utm_source=newsletter&b=2&a=1#install",
       ),
     ).toBe("https://example.com/docs?a=1&b=2");
+    expect(
+      canonicalizeSourceUrl(
+        "https://www.Example.com/Docs/Install?Version=Beta#intro",
+      ),
+    ).toBe("https://example.com/Docs/Install?Version=Beta");
+    expect(canonicalizeSourceUrl("https://example.com/Docs")).not.toBe(
+      canonicalizeSourceUrl("https://example.com/docs"),
+    );
     expect(canonicalizeSourceUrl("not a url")).toBe("not a url");
   });
 });

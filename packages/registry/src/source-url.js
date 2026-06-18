@@ -112,6 +112,7 @@ export function canonicalizeSourceUrl(value) {
   try {
     const url = new URL(stripped);
     url.hash = "";
+    url.protocol = url.protocol.toLowerCase();
     url.hostname = url.hostname.replace(/^www\./i, "").toLowerCase();
     while (url.pathname !== "/" && url.pathname.endsWith("/")) {
       url.pathname = url.pathname.slice(0, -1);
@@ -123,7 +124,7 @@ export function canonicalizeSourceUrl(value) {
     for (const [key, paramValue] of sortedParams) {
       url.searchParams.append(key, paramValue);
     }
-    return url.toString().toLowerCase();
+    return url.toString();
   } catch {
     return stripped.toLowerCase();
   }
