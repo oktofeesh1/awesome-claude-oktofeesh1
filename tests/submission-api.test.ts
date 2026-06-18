@@ -328,6 +328,51 @@ describe("website submission preflight API", () => {
     });
   });
 
+  it("preserves source URL path casing when deciding duplicate blockers", async () => {
+    directoryEntriesMock.mockResolvedValue([
+      {
+        category: "mcp",
+        slug: "case-sensitive-docs",
+        title: "Path Case Reference",
+        documentationUrl: "https://docs.example.org/Docs/Install",
+        canonicalUrl: "https://heyclau.de/entry/mcp/case-sensitive-docs",
+        trustSignals: { sourceUrls: [] },
+      },
+    ]);
+
+    const { POST } = await import("@/routes/api/submissions/preflight");
+    const response = await POST(
+      preflightRequest(
+        {
+          fields: validFields({
+            name: "Independent Mixed Path",
+            slug: "independent-mixed-path",
+            docs_url: "https://docs.example.org/docs/install",
+          }),
+        },
+        "203.0.113.20",
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.routeSuggestion).toBe("submit_pr");
+    expect(body.blockers).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "duplicate_existing" }),
+      ]),
+    );
+    expect(body.warnings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: "possible_duplicate_existing",
+          message:
+            "Possible related existing entry mcp:case-sensitive-docs: same source host.",
+        }),
+      ]),
+    );
+  });
+
   it("warns on similar titles and shared source hosts without blocking submission", async () => {
     directoryEntriesMock.mockResolvedValue([
       {
