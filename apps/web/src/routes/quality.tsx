@@ -19,6 +19,7 @@ import { CountUp } from "@/components/count-up";
 import { PageContainer } from "@/components/page-container";
 import { PageHeader } from "@/components/page-header";
 import { NewsletterInline } from "@/components/newsletter-inline";
+import { entryRef } from "@/lib/entry-identity";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/quality")({
@@ -422,7 +423,7 @@ function Queue({ title, help, rows }: { title: string; help: string; rows: Quali
       </div>
       <ul>
         {rows.map((r) => (
-          <li key={r.entry.slug} className="border-b border-border px-5 py-3 last:border-0">
+          <li key={entryRef(r.entry)} className="border-b border-border px-5 py-3 last:border-0">
             <div className="flex items-center justify-between gap-3">
               <Link
                 to="/entry/$category/$slug"

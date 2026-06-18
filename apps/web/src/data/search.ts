@@ -1,4 +1,5 @@
 import { ENTRIES, entryByRef } from "./entries";
+import { sameEntry } from "@/lib/entry-identity";
 import type {
   Category,
   Entry,
@@ -81,7 +82,12 @@ export function related(entry: Entry, limit = 4): Entry[] {
 
   if (graphEntries.length > 0) return graphEntries;
 
-  return ENTRIES.filter((e) => e.slug !== entry.slug)
+  return relatedBySimilarity(entry, ENTRIES, limit);
+}
+
+export function relatedBySimilarity(entry: Entry, entries: Entry[], limit = 4): Entry[] {
+  return entries
+    .filter((candidate) => !sameEntry(candidate, entry))
     .map((e) => {
       let score = 0;
       if (e.category === entry.category) score += 3;
@@ -119,13 +125,10 @@ export function relatedGroups(
     if (rel.relation === "duplicate") continue;
     const candidate = entryByRef(rel.category, rel.slug);
     if (!candidate) continue;
-    if (candidate.category === entry.category && candidate.slug === entry.slug) continue;
+    if (sameEntry(candidate, entry)) continue;
     const list = byRelation.get(rel.relation) ?? [];
     if (!byRelation.has(rel.relation)) byRelation.set(rel.relation, list);
-    if (
-      list.length < perGroup &&
-      !list.some((e) => e.category === candidate.category && e.slug === candidate.slug)
-    ) {
+    if (list.length < perGroup && !list.some((e) => sameEntry(e, candidate))) {
       list.push(candidate);
     }
   }

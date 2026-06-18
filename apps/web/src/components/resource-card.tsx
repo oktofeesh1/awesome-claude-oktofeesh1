@@ -46,7 +46,7 @@ function ResourceCardInner({
   rank?: number;
 }) {
   const { toggle, setOpen } = useCompareActions();
-  const inCompare = useIsCompared(entry.slug);
+  const inCompare = useIsCompared(entry);
   const peekRef = React.useRef<PeekHandle>(null);
   const handle = React.useMemo(() => ({ open: () => peekRef.current?.open() }), []);
   const [hovered, setHovered] = React.useState(false);

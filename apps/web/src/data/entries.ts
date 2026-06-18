@@ -1,5 +1,6 @@
 import atlasRegistry from "@/generated/atlas-registry.json";
 import { seoClusterDefinitions } from "@/data/seo-cluster-definitions";
+import { entryRef } from "@/lib/entry-identity";
 import type { Category, Entry } from "@/types/registry";
 import { buildEntry, type RegistryEntry } from "@/data/entry-normalize";
 
@@ -21,9 +22,7 @@ export const ENTRIES: Entry[] = REGISTRY_ENTRIES.map(buildEntry);
 // O(1) lookup by `category/slug`. Hot SSR paths (entry loader, /og route, the
 // /$category/$slug redirect, related()/relatedGroups(), trending) previously did
 // O(n) ENTRIES.find per lookup — and trending does ~50 lookups per request.
-const ENTRY_BY_REF: Map<string, Entry> = new Map(
-  ENTRIES.map((entry) => [`${entry.category}/${entry.slug}`, entry]),
-);
+const ENTRY_BY_REF: Map<string, Entry> = new Map(ENTRIES.map((entry) => [entryRef(entry), entry]));
 
 export function entryByRef(category: string, slug: string): Entry | undefined {
   return ENTRY_BY_REF.get(`${category}/${slug}`);

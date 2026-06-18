@@ -1,11 +1,18 @@
 import * as React from "react";
+import {
+  hasCompareItem,
+  resolveCompareParam,
+  serializeCompareItems,
+  toggleCompareItem,
+} from "@/lib/compare-selection";
+import type { EntryIdentity } from "@/lib/entry-identity";
 import type { Entry } from "@/types/registry";
 
 interface CompareActions {
   setOpen: (open: boolean) => void;
   toggle: (e: Entry) => void;
   clear: () => void;
-  has: (slug: string) => boolean;
+  has: (entry: EntryIdentity) => boolean;
   /** Hydrate selection from a `cat/slug,cat/slug` URL param string. */
   hydrate: (param: string) => void;
   /** Serialize current selection back to URL param shape. */
@@ -30,27 +37,6 @@ export interface CompareCtx extends CompareState, CompareActions {}
 
 const StoreCtx = React.createContext<CompareStore | null>(null);
 
-function resolve(entries: Entry[], param: string): Entry[] {
-  if (!param) return [];
-  const refs = param
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .slice(0, 4);
-  const seen = new Set<string>();
-  const out: Entry[] = [];
-  for (const ref of refs) {
-    const [cat, slug] = ref.split("/");
-    if (!cat || !slug || seen.has(ref)) continue;
-    const e = entries.find((x) => x.category === cat && x.slug === slug);
-    if (e) {
-      out.push(e);
-      seen.add(ref);
-    }
-  }
-  return out;
-}
-
 /**
  * A tiny external store backs the compare selection. Splitting state from the
  * stable `actions` object lets cards subscribe narrowly (see `useIsCompared`):
@@ -73,11 +59,7 @@ function createCompareStore(): CompareStore {
     },
     toggle: (e) => {
       const cur = state.items;
-      const next = cur.find((x) => x.slug === e.slug)
-        ? cur.filter((x) => x.slug !== e.slug)
-        : cur.length >= 4
-          ? cur
-          : [...cur, e];
+      const next = toggleCompareItem(cur, e);
       if (next === cur) return; // at the 4-item cap — no change
       setState({ ...state, items: next });
     },
@@ -85,7 +67,7 @@ function createCompareStore(): CompareStore {
       if (state.items.length === 0 && !state.open) return;
       setState({ items: [], open: false });
     },
-    has: (slug) => state.items.some((x) => x.slug === slug),
+    has: (entry) => hasCompareItem(state.items, entry),
     hydrate: (param) => {
       if (!param) {
         if (state.items.length) setState({ ...state, items: [] });
@@ -94,15 +76,15 @@ function createCompareStore(): CompareStore {
       // Lazy-load the dataset only when a compare selection is hydrated from the
       // URL, keeping the registry dataset out of the universal client bundle.
       void import("@/data/entries").then(({ ENTRIES }) => {
-        const next = resolve(ENTRIES, param);
-        const sig = next.map((e) => `${e.category}/${e.slug}`).join(",");
-        const curSig = state.items.map((e) => `${e.category}/${e.slug}`).join(",");
+        const next = resolveCompareParam(ENTRIES, param);
+        const sig = serializeCompareItems(next);
+        const curSig = serializeCompareItems(state.items);
         if (sig !== curSig) setState({ ...state, items: next });
       });
     },
-    serialize: () => state.items.map((e) => `${e.category}/${e.slug}`).join(","),
+    serialize: () => serializeCompareItems(state.items),
     getShareUrl: () => {
-      const sig = state.items.map((e) => `${e.category}/${e.slug}`).join(",");
+      const sig = serializeCompareItems(state.items);
       const origin = typeof window !== "undefined" ? window.location.origin : "";
       return sig ? `${origin}/browse?compare=${encodeURIComponent(sig)}` : `${origin}/browse`;
     },
@@ -137,11 +119,11 @@ export function useCompareActions(): CompareActions {
 
 /** Narrow per-card subscription: a card re-renders only when its own
  * membership in the compare set flips, not on every selection change. */
-export function useIsCompared(slug: string): boolean {
+export function useIsCompared(entry: EntryIdentity): boolean {
   const store = useStore();
   return React.useSyncExternalStore(
     store.subscribe,
-    () => store.getState().items.some((x) => x.slug === slug),
+    () => hasCompareItem(store.getState().items, entry),
     () => false,
   );
 }

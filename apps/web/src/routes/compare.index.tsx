@@ -10,6 +10,8 @@ import { Breadcrumbs } from "@/components/breadcrumbs";
 import { CopyButton } from "@/components/copy-button";
 import { COMPARISON_ROWS as ROWS } from "@/components/comparison-table";
 import { useCompare } from "@/lib/compare";
+import { resolveCompareParam, serializeCompareItems } from "@/lib/compare-selection";
+import { sameEntry } from "@/lib/entry-identity";
 import { search } from "@/data/search";
 import { cn } from "@/lib/utils";
 import type { Entry } from "@/types/registry";
@@ -41,23 +43,7 @@ export const Route = createFileRoute("/compare/")({
 });
 
 function resolveIds(ids: string): Entry[] {
-  if (!ids) return [];
-  const seen = new Set<string>();
-  const out: Entry[] = [];
-  for (const ref of ids
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .slice(0, 4)) {
-    if (seen.has(ref)) continue;
-    const [cat, slug] = ref.split("/");
-    const e = ENTRIES.find((x) => x.category === cat && x.slug === slug);
-    if (e) {
-      out.push(e);
-      seen.add(ref);
-    }
-  }
-  return out;
+  return resolveCompareParam(ENTRIES, ids);
 }
 
 function ComparePage() {
@@ -76,26 +62,26 @@ function ComparePage() {
   const [pickerOpen, setPickerOpen] = React.useState(false);
 
   const pushIds = (next: Entry[]) => {
-    const ids = next.map((e) => `${e.category}/${e.slug}`).join(",");
+    const ids = serializeCompareItems(next);
     navigate({ search: { ids } });
   };
 
   const removeItem = (e: Entry) => {
-    const next = items.filter((x) => !(x.category === e.category && x.slug === e.slug));
+    const next = items.filter((x) => !sameEntry(x, e));
     compare.toggle(e);
     pushIds(next);
   };
 
   const addItem = (e: Entry) => {
     if (items.length >= 4) return;
-    if (items.some((x) => x.category === e.category && x.slug === e.slug)) return;
+    if (items.some((x) => sameEntry(x, e))) return;
     compare.toggle(e);
     pushIds([...items, e]);
     setPickerOpen(false);
   };
 
   const copyShare = () => {
-    const sig = items.map((e) => `${e.category}/${e.slug}`).join(",");
+    const sig = serializeCompareItems(items);
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     return sig ? `${origin}/compare?ids=${encodeURIComponent(sig)}` : `${origin}/compare`;
   };
@@ -292,7 +278,7 @@ function AddColumn({
   const [q, setQ] = React.useState("");
   const results = React.useMemo(() => {
     const list = search({ q, sort: "popular" }).slice(0, 8);
-    return list.filter((e) => !exclude.some((x) => x.category === e.category && x.slug === e.slug));
+    return list.filter((e) => !exclude.some((x) => sameEntry(x, e)));
   }, [q, exclude]);
 
   if (!open) {
