@@ -43,8 +43,7 @@ async function resolveBrandIconUrl(domain: string, clientId: string) {
   const results = (await searchResponse.json()) as BrandSearchResult[];
   if (!Array.isArray(results)) return "";
 
-  const exact =
-    results.find((result) => normalizeBrandDomain(result.domain) === domain) || results[0];
+  const exact = results.find((result) => normalizeBrandDomain(result.domain) === domain);
   return typeof exact?.icon === "string" ? exact.icon : "";
 }
 

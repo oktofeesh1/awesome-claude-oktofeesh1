@@ -377,6 +377,66 @@ describe("central API router security", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("serves Brandfetch icons only for exact normalized domain matches", async () => {
+    process.env.BRANDFETCH_CLIENT_ID = "test-client";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json([
+          {
+            domain: "www.example.com",
+            icon: "https://cdn.brandfetch.io/example/icon.png",
+          },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        new Response("png", {
+          headers: {
+            "content-length": "3",
+            "content-type": "image/png; charset=utf-8",
+          },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { GET } = await import("@/routes/api/brand-assets/$kind/$domain");
+    const response = await GET(
+      new Request("https://heyclau.de/api/brand-assets/icon/example.com"),
+      { params: { kind: "icon", domain: "example.com" } },
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/png");
+    await expect(response.text()).resolves.toBe("png");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not serve the first Brandfetch icon when the result domain differs", async () => {
+    process.env.BRANDFETCH_CLIENT_ID = "test-client";
+    const fetchMock = vi.fn(async () =>
+      Response.json([
+        {
+          domain: "other.example",
+          icon: "https://cdn.brandfetch.io/other/icon.png",
+        },
+      ]),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { GET } = await import("@/routes/api/brand-assets/$kind/$domain");
+    const response = await GET(
+      new Request("https://heyclau.de/api/brand-assets/icon/example.com"),
+      { params: { kind: "icon", domain: "example.com" } },
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({
+      ok: false,
+      error: { code: "brand_asset_not_found" },
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects Brandfetch icons outside the trusted asset CDN", async () => {
     process.env.BRANDFETCH_CLIENT_ID = "test-client";
     const fetchMock = vi.fn(async () =>
