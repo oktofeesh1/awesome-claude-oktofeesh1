@@ -239,19 +239,25 @@ describe("registry submission parsing and validation", () => {
       ]),
     );
 
-    expect(
-      validateSubmission({
-        title: "Add MCP server: Bad contact",
-        body: buildSubmissionPrBody({
-          ...validMcpFields,
-          contact_email: "user@example.com@attacker.com",
-        }),
-      }).errors,
-    ).toEqual(
-      expect.arrayContaining([
-        "Invalid public contact: use a GitHub handle, GitHub profile URL, or email",
-      ]),
-    );
+    for (const contact_email of [
+      "user@example.com@attacker.com",
+      "user@.example.com",
+      "user@example.com.",
+    ]) {
+      expect(
+        validateSubmission({
+          title: "Add MCP server: Bad contact",
+          body: buildSubmissionPrBody({
+            ...validMcpFields,
+            contact_email,
+          }),
+        }).errors,
+      ).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining("Invalid public contact"),
+        ]),
+      );
+    }
   });
 });
 
