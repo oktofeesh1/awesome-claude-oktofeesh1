@@ -213,18 +213,21 @@ describe("submission gate GitHub client", () => {
               name: "validate-web",
               status: "completed",
               conclusion: "success",
+              app: { slug: "github-actions" },
               completed_at: "2026-01-02T00:00:00Z",
             },
             {
               name: "Superagent Security Scan",
               status: "completed",
               conclusion: "neutral",
+              app: { slug: "superagent" },
               completed_at: "2026-01-02T00:00:00Z",
             },
             {
               name: "coverage",
               status: "completed",
               conclusion: "failure",
+              app: { slug: "github-actions" },
               completed_at: "2026-01-02T00:00:00Z",
             },
           ],
@@ -281,6 +284,7 @@ describe("submission gate GitHub client", () => {
             {
               name: "validate-content",
               status: "in_progress",
+              app: { slug: "github-actions" },
               started_at: "2026-01-02T00:00:00Z",
             },
           ],
@@ -303,6 +307,85 @@ describe("submission gate GitHub client", () => {
         }),
         expect.objectContaining({ name: "missing-check", status: "missing" }),
       ]),
+    });
+  });
+
+  it("ignores spoofed required check-runs from untrusted apps", async () => {
+    mockFetchQueue([
+      {
+        body: {
+          check_runs: [
+            {
+              name: "Superagent Security Scan",
+              status: "completed",
+              conclusion: "failure",
+              app: { slug: "superagent" },
+              completed_at: "2026-01-02T00:00:00Z",
+            },
+            {
+              name: "Superagent Security Scan",
+              status: "completed",
+              conclusion: "success",
+              app: { slug: "attacker-ci" },
+              completed_at: "2026-01-02T00:00:01Z",
+            },
+          ],
+        },
+      },
+    ]);
+
+    await expect(
+      getCommitValidationState({
+        token: "ghs",
+        repo,
+        ref: "abc123",
+        requiredChecks: ["Superagent Security Scan"],
+      }),
+    ).resolves.toMatchObject({
+      state: "failed",
+      checks: [
+        {
+          name: "Superagent Security Scan",
+          status: "failed",
+          details: "concluded failure",
+        },
+      ],
+    });
+  });
+
+  it("fails closed for unknown required check-run names", async () => {
+    mockFetchQueue([
+      {
+        body: {
+          check_runs: [
+            {
+              name: "new-required-check",
+              status: "completed",
+              conclusion: "success",
+              app: { slug: "attacker-ci" },
+              completed_at: "2026-01-02T00:00:00Z",
+            },
+          ],
+        },
+      },
+    ]);
+
+    await expect(
+      getCommitValidationState({
+        token: "ghs",
+        repo,
+        ref: "abc123",
+        requiredChecks: ["new-required-check"],
+      }),
+    ).resolves.toMatchObject({
+      state: "pending",
+      checks: [
+        {
+          name: "new-required-check",
+          status: "missing",
+          details: "has not reported yet",
+        },
+      ],
     });
   });
 
