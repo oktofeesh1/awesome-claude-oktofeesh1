@@ -118,10 +118,18 @@ function normalizeError(error: unknown) {
   return { message: String(error) };
 }
 
+function submittedSourceValues(fields: Record<string, unknown>) {
+  return [
+    fields.github_url,
+    fields.docs_url,
+    fields.source_url,
+    fields.download_url,
+    fields.website_url,
+  ];
+}
+
 function submittedSourceUrls(fields: Record<string, unknown>) {
-  return [fields.github_url, fields.docs_url, fields.source_url, fields.download_url]
-    .map(canonicalizeSourceUrl)
-    .filter(Boolean);
+  return submittedSourceValues(fields).map(canonicalizeSourceUrl).filter(Boolean);
 }
 
 function entrySourceValues(entry: DirectoryEntry) {
@@ -129,7 +137,14 @@ function entrySourceValues(entry: DirectoryEntry) {
     entry.repoUrl,
     entry.githubUrl,
     entry.documentationUrl,
+    entry.docsUrl,
+    entry.sourceUrl,
+    entry.packageUrl,
+    entry.repositoryUrl,
+    entry.websiteUrl,
     entry.downloadUrl,
+    ...(entry.sourceUrls ?? []),
+    ...(entry.retrievalSources ?? []),
     ...(entry.trustSignals?.sourceUrls ?? []),
   ];
 }
@@ -141,12 +156,7 @@ function duplicateCandidates(params: {
   slug: string;
 }) {
   const title = normalizeComparable(params.fields.name || params.fields.title || "");
-  const submittedValues = [
-    params.fields.github_url,
-    params.fields.docs_url,
-    params.fields.source_url,
-    params.fields.download_url,
-  ];
+  const submittedValues = submittedSourceValues(params.fields);
   const submittedProfile = sourceProfile(submittedValues);
   const sourceUrlSet = new Set(submittedSourceUrls(params.fields));
   const candidates: DuplicateCandidate[] = [];

@@ -242,6 +242,92 @@ describe("website submission preflight API", () => {
     });
   });
 
+  it("blocks website URL duplicates before PR submission", async () => {
+    directoryEntriesMock.mockResolvedValue([
+      {
+        category: "mcp",
+        slug: "website-backed-source",
+        title: "Website Backed Source",
+        websiteUrl: "https://product.example.com/claude-mcp",
+        canonicalUrl: "https://heyclau.de/entry/mcp/website-backed-source",
+        trustSignals: { sourceUrls: [] },
+      },
+    ]);
+
+    const { POST } = await import("@/routes/api/submissions/preflight");
+    const response = await POST(
+      preflightRequest(
+        {
+          fields: validFields({
+            name: "New Website Backed Source",
+            slug: "new-website-backed-source",
+            docs_url: "https://docs.example.com/new-website-backed-source",
+            website_url:
+              "https://www.product.example.com/claude-mcp/?utm_source=newsletter#overview",
+          }),
+        },
+        "203.0.113.18",
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      routeSuggestion: "fix_required",
+      blockers: expect.arrayContaining([
+        expect.objectContaining({
+          code: "duplicate_existing",
+          message:
+            "Likely duplicate of mcp:website-backed-source: same source.",
+        }),
+      ]),
+      duplicates: expect.arrayContaining([
+        expect.objectContaining({
+          key: "mcp:website-backed-source",
+          reasonLabels: expect.arrayContaining(["same source"]),
+        }),
+      ]),
+    });
+  });
+
+  it("matches top-level directory sourceUrls during duplicate preflight", async () => {
+    directoryEntriesMock.mockResolvedValue([
+      {
+        category: "mcp",
+        slug: "source-list-backed",
+        title: "Source List Backed",
+        sourceUrls: ["https://docs.example.net/source-list-backed"],
+        canonicalUrl: "https://heyclau.de/entry/mcp/source-list-backed",
+        trustSignals: { sourceUrls: [] },
+      },
+    ]);
+
+    const { POST } = await import("@/routes/api/submissions/preflight");
+    const response = await POST(
+      preflightRequest(
+        {
+          fields: validFields({
+            name: "New Source List Backed",
+            slug: "new-source-list-backed",
+            docs_url:
+              "https://docs.example.net/source-list-backed/?utm_campaign=launch",
+          }),
+        },
+        "203.0.113.19",
+      ),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      routeSuggestion: "fix_required",
+      blockers: expect.arrayContaining([
+        expect.objectContaining({
+          code: "duplicate_existing",
+          message: "Likely duplicate of mcp:source-list-backed: same source.",
+        }),
+      ]),
+    });
+  });
+
   it("warns on similar titles and shared source hosts without blocking submission", async () => {
     directoryEntriesMock.mockResolvedValue([
       {
