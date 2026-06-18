@@ -19,31 +19,140 @@ export interface SearchFilters {
   sort?: "popular" | "newest" | "title";
 }
 
-export function search(filters: SearchFilters = {}): Entry[] {
-  const q = filters.q?.trim().toLowerCase() ?? "";
-  let rows = ENTRIES.filter((e) => {
-    if (filters.categories?.length && !filters.categories.includes(e.category)) return false;
-    if (filters.platforms?.length && !e.platforms.some((p) => filters.platforms!.includes(p)))
-      return false;
-    if (filters.trust?.length && !filters.trust.includes(e.trust)) return false;
-    if (filters.source?.length && !filters.source.includes(e.source)) return false;
-    if (filters.installable && !e.installCommand && !e.configSnippet && !e.fullCopy) return false;
-    if (filters.hasSafetyNotes && !e.safetyNotes) return false;
-    if (q) {
-      const hay = [
-        e.title,
-        e.description,
-        e.author,
-        e.category,
-        ...(e.tags ?? []),
-        ...(e.keywords ?? []),
-      ]
-        .join(" ")
-        .toLowerCase();
-      if (!hay.includes(q)) return false;
-    }
+const TOKEN_SPLIT_PATTERN = /[^a-z0-9+#.-]+/i;
+
+const QUERY_ALIASES: Record<string, string[]> = {
+  browser: ["chrome", "playwright", "web"],
+  cc: ["claude", "claude-code"],
+  claude: ["claude-code"],
+  gh: ["github"],
+  mcp: ["model-context-protocol"],
+  repo: ["repository", "github"],
+  repos: ["repository", "github"],
+  safe: ["safety", "security", "secure", "trust", "privacy"],
+  security: ["safe", "safety", "secure", "trust"],
+  skill: ["skills"],
+  skills: ["skill"],
+  statusline: ["statuslines", "status"],
+  statuslines: ["statusline", "status"],
+};
+
+interface EntrySearchProfile {
+  haystack: string;
+  words: string[];
+}
+
+const ENTRY_SEARCH_PROFILES = new WeakMap<Entry, EntrySearchProfile>();
+
+function tokenizeSearchQuery(query: string) {
+  return query
+    .split(TOKEN_SPLIT_PATTERN)
+    .map((token) => token.trim().toLowerCase())
+    .filter((token) => token.length >= 2)
+    .slice(0, 12);
+}
+
+function expandedTokenCandidates(token: string) {
+  return [token, ...(QUERY_ALIASES[token] ?? [])];
+}
+
+function normalizedSearchText(entry: Entry) {
+  return [
+    entry.category,
+    entry.slug,
+    entry.title,
+    entry.description,
+    entry.cardDescription,
+    entry.author,
+    entry.trust,
+    entry.source,
+    ...(entry.platforms ?? []),
+    ...(entry.tags ?? []),
+    ...(entry.keywords ?? []),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function entrySearchProfile(entry: Entry) {
+  let profile = ENTRY_SEARCH_PROFILES.get(entry);
+  if (!profile) {
+    const haystack = normalizedSearchText(entry);
+    const words = [
+      ...new Set(
+        haystack
+          .split(TOKEN_SPLIT_PATTERN)
+          .map((word) => word.trim().toLowerCase())
+          .filter(Boolean),
+      ),
+    ];
+    profile = {
+      haystack,
+      words,
+    };
+    ENTRY_SEARCH_PROFILES.set(entry, profile);
+  }
+  return profile;
+}
+
+function candidateMatchesText(candidate: string, profile: EntrySearchProfile) {
+  if (candidate.length <= 2) {
+    return profile.words.some((word) => word === candidate || word.startsWith(candidate));
+  }
+  return (
+    profile.haystack.includes(candidate) || profile.words.some((word) => word.startsWith(candidate))
+  );
+}
+
+export function matchesEntryQuery(entry: Entry, query: string) {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return true;
+
+  const tokens = tokenizeSearchQuery(normalizedQuery);
+  if (!tokens.length) return false;
+
+  const profile = entrySearchProfile(entry);
+  if (
+    normalizedQuery.length > 2
+      ? profile.haystack.includes(normalizedQuery)
+      : candidateMatchesText(normalizedQuery, profile)
+  ) {
     return true;
-  });
+  }
+
+  return tokens.every((token) =>
+    expandedTokenCandidates(token).some((candidate) => candidateMatchesText(candidate, profile)),
+  );
+}
+
+export function matchesSearchFilters(entry: Entry, filters: SearchFilters = {}) {
+  if (filters.categories?.length && !filters.categories.includes(entry.category)) return false;
+  if (filters.platforms?.length && !entry.platforms.some((p) => filters.platforms!.includes(p)))
+    return false;
+  if (filters.trust?.length && !filters.trust.includes(entry.trust)) return false;
+  if (filters.source?.length && !filters.source.includes(entry.source)) return false;
+  if (filters.installable && !entry.installCommand && !entry.configSnippet && !entry.fullCopy)
+    return false;
+  if (filters.hasSafetyNotes && !entry.safetyNotes) return false;
+  if (filters.q && !matchesEntryQuery(entry, filters.q)) return false;
+  return true;
+}
+
+export function filterSearchEntries(filters: SearchFilters = {}, entries: Entry[] = ENTRIES) {
+  return entries.filter((entry) => matchesSearchFilters(entry, filters));
+}
+
+export function countSearchResults(filters: SearchFilters = {}, entries: Entry[] = ENTRIES) {
+  let count = 0;
+  for (const entry of entries) {
+    if (matchesSearchFilters(entry, filters)) count += 1;
+  }
+  return count;
+}
+
+export function search(filters: SearchFilters = {}): Entry[] {
+  let rows = filterSearchEntries(filters);
 
   const sort = filters.sort ?? "popular";
   rows = [...rows].sort((a, b) => {

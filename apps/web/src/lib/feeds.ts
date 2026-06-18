@@ -8,10 +8,17 @@
  * helper `respondFeed` handles `If-None-Match` and emits cache headers.
  */
 import { ENTRIES } from "@/data/entries";
+import { filterSearchEntries } from "@/data/search";
 import { CHANGELOG, RELEASE_NOTES } from "@/data/changelog";
 import { getGrowthSurfaces } from "@/lib/growth-surfaces";
 import { ifNoneMatchMatches } from "@/lib/http-cache";
-import { CATEGORIES, type Category } from "@/types/registry";
+import {
+  CATEGORIES,
+  type Category,
+  type Platform,
+  type SourceStatus,
+  type TrustLevel,
+} from "@/types/registry";
 
 export const SITE_NAME = "HeyClaude";
 export const SITE_TAGLINE =
@@ -238,26 +245,16 @@ export interface SavedSearchQuery {
 }
 
 export function applySavedSearch(q: SavedSearchQuery): FeedItem[] {
-  const needle = (q.q ?? "").trim().toLowerCase();
-  return ENTRIES.filter((e) => {
-    if (q.category && e.category !== q.category) return false;
-    if (q.trust && e.trust !== q.trust) return false;
-    if (q.source && e.source !== q.source) return false;
-    if (q.platform && !(e.platforms ?? []).some((p) => p === q.platform)) return false;
-    if (needle) {
-      const hay = [
-        e.title,
-        e.description,
-        e.cardDescription ?? "",
-        (e.tags ?? []).join(" "),
-        e.author ?? "",
-      ]
-        .join(" ")
-        .toLowerCase();
-      if (!hay.includes(needle)) return false;
-    }
-    return true;
-  })
+  return filterSearchEntries(
+    {
+      q: q.q,
+      categories: q.category ? [q.category as Category] : undefined,
+      trust: q.trust ? [q.trust as TrustLevel] : undefined,
+      source: q.source ? [q.source as SourceStatus] : undefined,
+      platforms: q.platform ? [q.platform as Platform] : undefined,
+    },
+    ENTRIES,
+  )
     .sort((a, b) => (a.dateAdded < b.dateAdded ? 1 : -1))
     .slice(0, 50)
     .map((e) => ({

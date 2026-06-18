@@ -11,7 +11,7 @@ import { useMemo } from "react";
 import { toast } from "sonner";
 import { ResourceCard } from "@/components/resource-card";
 import { FilterChip, FilterChipGroup } from "@/components/filter-chip";
-import { search } from "@/data/search";
+import { countSearchResults, search } from "@/data/search";
 import {
   CATEGORIES,
   type Category,
@@ -32,7 +32,7 @@ import {
 } from "lucide-react";
 import { useCompare } from "@/lib/compare";
 import { useRecents, type SavedSearch } from "@/lib/recents";
-import { ENTRIES } from "@/data/entries";
+import { entryByRef } from "@/data/entries";
 import { SavedSearchManager } from "@/components/saved-search-manager";
 import { FilterSummaryBar, type ActiveFilter } from "@/components/filter-summary-bar";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
@@ -324,19 +324,19 @@ function Browse() {
   }, [sp.q, sp.category, sp.trust, sp.source, sp.platform, sp.sort]);
 
   // Per-axis facet counts: how many results if this value were the only filter
-  // in its axis. Memoized on the search params so the ~23 search() passes run
-  // once per filter change instead of on every render (compare toggle, hover…).
+  // in its axis. Memoized on the search params and counted without sorting so
+  // sidebar counts do not pay for result ranking on every filter change.
   const facetCounts = useMemo(() => {
     const countFor = (axis: "category" | "trust" | "source" | "platform", value: string) => {
       const merged = { ...sp, [axis]: value } as typeof sp;
-      return search({
+      return countSearchResults({
         q: merged.q,
         categories: merged.category ? [merged.category as Category] : undefined,
         trust: merged.trust ? [merged.trust as TrustLevel] : undefined,
         source: merged.source ? [merged.source as SourceStatus] : undefined,
         platforms: merged.platform ? [merged.platform as Platform] : undefined,
         sort: merged.sort,
-      }).length;
+      });
     };
     return {
       category: Object.fromEntries(CATEGORIES.map((c) => [c.id, countFor("category", c.id)])),
@@ -359,7 +359,7 @@ function Browse() {
   });
 
   const recentEntries = recents.entries
-    .map((r) => ENTRIES.find((e) => e.category === r.category && e.slug === r.slug))
+    .map((r) => entryByRef(r.category, r.slug))
     .filter((e): e is NonNullable<typeof e> => !!e)
     .slice(0, 6);
 
@@ -409,14 +409,14 @@ function Browse() {
     return trials
       .map((t) => {
         const merged = { ...sp, ...t.patch };
-        const count = search({
+        const count = countSearchResults({
           q: merged.q,
           categories: merged.category ? [merged.category as Category] : undefined,
           trust: merged.trust ? [merged.trust as TrustLevel] : undefined,
           source: merged.source ? [merged.source as SourceStatus] : undefined,
           platforms: merged.platform ? [merged.platform as Platform] : undefined,
           sort: merged.sort,
-        }).length;
+        });
         return { label: t.label, count, apply: () => set(t.patch) };
       })
       .filter((s) => s.count > 0)
@@ -835,7 +835,12 @@ function Browse() {
               ) : sp.view === "compact" ? (
                 <div className="mt-2 overflow-hidden rounded-lg border border-border bg-surface">
                   {results.slice(0, shown).map((e, i) => (
-                    <ResourceCard key={`${e.category}/${e.slug}`} entry={e} variant="compact" rank={i + 1} />
+                    <ResourceCard
+                      key={`${e.category}/${e.slug}`}
+                      entry={e}
+                      variant="compact"
+                      rank={i + 1}
+                    />
                   ))}
                 </div>
               ) : (
