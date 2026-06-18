@@ -4559,6 +4559,11 @@
                                 "type": "array",
                                 "items": { "type": "string", "maxLength": 80 },
                                 "maxItems": 8
+                              },
+                              "reasonLabels": {
+                                "type": "array",
+                                "items": { "type": "string", "maxLength": 120 },
+                                "maxItems": 8
                               }
                             },
                             "required": ["key", "category", "slug", "title", "url", "reasons"]
@@ -4697,6 +4702,11 @@
                               "reasons": {
                                 "type": "array",
                                 "items": { "type": "string", "maxLength": 80 },
+                                "maxItems": 8
+                              },
+                              "reasonLabels": {
+                                "type": "array",
+                                "items": { "type": "string", "maxLength": 120 },
                                 "maxItems": 8
                               }
                             },
