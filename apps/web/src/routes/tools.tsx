@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowUpRight, BadgeCheck } from "lucide-react";
 import { COMMERCIAL_TOOLS } from "@/data/tools";
 import { PageContainer } from "@/components/page-container";
+import { EntryBrandMark } from "@/components/entry-brand-mark";
 import { breadcrumbScript, itemListScript } from "@/lib/seo-jsonld";
 import { absoluteUrl } from "@/lib/seo";
 import { ogImageUrl } from "@/lib/og-image";
@@ -85,10 +86,13 @@ function ToolsPage() {
             className="group flex flex-col gap-3 rounded-xl border border-border bg-surface p-5 transition-colors duration-200 ease-out hover:bg-surface-2"
           >
             <div className="flex items-start justify-between gap-2">
-              <div>
-                <div className="font-display text-lg font-semibold text-ink">{t.name}</div>
-                <div className="mt-0.5 text-xs text-ink-muted">
-                  {t.category} · {t.pricingModel}
+              <div className="flex min-w-0 items-start gap-3">
+                <EntryBrandMark entry={t} size="md" className="mt-0.5" />
+                <div className="min-w-0">
+                  <div className="font-display text-lg font-semibold text-ink">{t.name}</div>
+                  <div className="mt-0.5 text-xs text-ink-muted">
+                    {t.category} · {t.pricingModel}
+                  </div>
                 </div>
               </div>
               <DisclosureBadge value={t.disclosure} />

@@ -44,6 +44,8 @@ export type RegistryEntry = Record<string, unknown> & {
   brandName?: string;
   brandDomain?: string;
   brandIconUrl?: string;
+  brandLogoUrl?: string;
+  brandAssetSource?: string;
   prerequisites?: string[];
   safetyNotes?: string | string[];
   privacyNotes?: string | string[];
@@ -399,6 +401,8 @@ export function buildEntry(entry: RegistryEntry): Entry {
     brandName: entry.brandName,
     brandDomain: entry.brandDomain,
     brandIconUrl: entry.brandIconUrl,
+    brandLogoUrl: entry.brandLogoUrl,
+    brandAssetSource: entry.brandAssetSource,
     tags: entry.tags ?? [],
     keywords: entry.keywords ?? [],
     platforms,
