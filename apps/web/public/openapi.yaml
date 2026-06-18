@@ -3517,6 +3517,7 @@ paths:
             type: string
             enum:
               - icon
+              - logo
           required: true
           name: kind
           in: path

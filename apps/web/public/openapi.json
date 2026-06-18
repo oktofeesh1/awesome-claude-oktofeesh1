@@ -2984,7 +2984,7 @@
         "description": "Returns a cacheable HeyClaude-hosted brand asset backed by Brandfetch when a registry entry has a validated brand domain.",
         "parameters": [
           {
-            "schema": { "type": "string", "enum": ["icon"] },
+            "schema": { "type": "string", "enum": ["icon", "logo"] },
             "required": true,
             "name": "kind",
             "in": "path"

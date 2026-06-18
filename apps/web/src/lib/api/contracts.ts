@@ -775,7 +775,7 @@ export const ogQuerySchema = z.object({
 });
 
 export const brandAssetParamsSchema = z.object({
-  kind: z.literal("icon"),
+  kind: z.enum(["icon", "logo"]),
   domain: z
     .string()
     .trim()
