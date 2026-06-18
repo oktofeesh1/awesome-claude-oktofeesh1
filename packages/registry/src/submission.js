@@ -64,7 +64,11 @@ export const HEADING_KEY_MAP = {
   "author-profile-url": "author_profile_url",
   "submitted-via": "submitted_via",
   "contact-email": "contact_email",
+  contact: "contact_email",
+  contactemail: "contact_email",
   email: "contact_email",
+  "public-contact": "contact_email",
+  "public-email": "contact_email",
   tags: "tags",
   description: "description",
   "what-it-does": "description",
@@ -296,6 +300,9 @@ function mapJsonData(data) {
     category: "category",
     description: "description",
     author: "author",
+    contact: "contact_email",
+    contactEmail: "contact_email",
+    publicContact: "contact_email",
     github: "github_url",
     githubUrl: "github_url",
     repoUrl: "github_url",
@@ -717,8 +724,17 @@ function isValidPublicContact(value) {
   const normalized = normalizeValue(value);
   if (!normalized) return true;
   if (normalized.includes("@")) {
-    const [local, domain] = normalized.split("@");
-    if (local && domain && domain.includes(".") && !normalized.includes(" ")) {
+    const parts = normalized.split("@");
+    const [local, domain] = parts;
+    if (
+      parts.length === 2 &&
+      local &&
+      domain &&
+      domain.includes(".") &&
+      !domain.startsWith(".") &&
+      !domain.endsWith(".") &&
+      !normalized.includes(" ")
+    ) {
       return true;
     }
   }
