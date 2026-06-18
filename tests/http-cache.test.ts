@@ -1,9 +1,24 @@
 import { describe, expect, it } from "vitest";
 
 import { respondFeed } from "@/lib/feeds";
-import { cachedJsonResponse, cachedTextResponse } from "@/lib/http-cache";
+import {
+  cachedJsonResponse,
+  cachedTextResponse,
+  ifNoneMatchMatches,
+} from "@/lib/http-cache";
+import { respondText } from "@/lib/llms";
 
 describe("HTTP cache helpers", () => {
+  it("matches strong, weak, list, and wildcard ETag validators", () => {
+    const etag = '"sha256-abcdef"';
+    expect(ifNoneMatchMatches(null, etag)).toBe(false);
+    expect(ifNoneMatchMatches('"sha256-deadbeef"', etag)).toBe(false);
+    expect(ifNoneMatchMatches(etag, etag)).toBe(true);
+    expect(ifNoneMatchMatches(`W/${etag}`, etag)).toBe(true);
+    expect(ifNoneMatchMatches(`"sha256-deadbeef", W/${etag}`, etag)).toBe(true);
+    expect(ifNoneMatchMatches("*", etag)).toBe(true);
+  });
+
   it("accepts Cloudflare weak ETag revalidation headers", async () => {
     const first = await cachedJsonResponse(
       new Request("https://heyclau.de/api/registry/feed"),
@@ -22,6 +37,26 @@ describe("HTTP cache helpers", () => {
     );
 
     expect(second.status).toBe(304);
+
+    const multi = await cachedJsonResponse(
+      new Request("https://heyclau.de/api/registry/feed", {
+        headers: {
+          "if-none-match": `"deadbeef", W/${etag}`,
+        },
+      }),
+      { ok: true },
+    );
+    expect(multi.status).toBe(304);
+
+    const wildcard = await cachedJsonResponse(
+      new Request("https://heyclau.de/api/registry/feed", {
+        headers: {
+          "if-none-match": "*",
+        },
+      }),
+      { ok: true },
+    );
+    expect(wildcard.status).toBe(304);
   });
 
   it("attaches security headers to cacheable registry responses", async () => {
@@ -64,6 +99,31 @@ describe("HTTP cache helpers", () => {
     );
     expect(second.status).toBe(304);
     expect(await second.text()).toBe("");
+  });
+
+  it("revalidates LLM text responses with weak and wildcard ETags", async () => {
+    const first = await respondText(
+      new Request("https://heyclau.de/llms.txt"),
+      "# HeyClaude\n",
+    );
+    const etag = first.headers.get("etag");
+    expect(etag).toBeTruthy();
+
+    const weak = await respondText(
+      new Request("https://heyclau.de/llms.txt", {
+        headers: { "if-none-match": `W/${etag}` },
+      }),
+      "# HeyClaude\n",
+    );
+    expect(weak.status).toBe(304);
+
+    const wildcard = await respondText(
+      new Request("https://heyclau.de/llms.txt", {
+        headers: { "if-none-match": "*" },
+      }),
+      "# HeyClaude\n",
+    );
+    expect(wildcard.status).toBe(304);
   });
 });
 

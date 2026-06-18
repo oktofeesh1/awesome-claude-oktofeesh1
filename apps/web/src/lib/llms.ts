@@ -10,6 +10,7 @@
 import { ENTRIES, REGISTRY_ENTRIES } from "@/data/entries";
 import { CATEGORIES } from "@/types/registry";
 import { etagFor } from "@/lib/feeds";
+import { ifNoneMatchMatches } from "@/lib/http-cache";
 import { applySecurityHeaders } from "@/lib/security-headers";
 import { buildEntryCitationFacts } from "@heyclaude/registry";
 
@@ -134,7 +135,6 @@ const TEXT_CACHE = "public, max-age=300, stale-while-revalidate=3600";
 
 export async function respondText(request: Request, body: string): Promise<Response> {
   const etag = await etagFor(body);
-  const ifNoneMatch = request.headers.get("if-none-match");
   const headers = applySecurityHeaders(
     new Headers({
       "Content-Type": "text/plain; charset=utf-8",
@@ -142,7 +142,7 @@ export async function respondText(request: Request, body: string): Promise<Respo
       ETag: etag,
     }),
   );
-  if (ifNoneMatch && ifNoneMatch === etag) {
+  if (ifNoneMatchMatches(request.headers.get("if-none-match"), etag)) {
     return new Response(null, { status: 304, headers });
   }
   return new Response(body, { headers });

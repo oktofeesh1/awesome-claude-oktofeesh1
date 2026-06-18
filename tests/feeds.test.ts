@@ -127,6 +127,21 @@ describe("respondFeed conditional GET", () => {
     expect(await res.text()).toBe("");
   });
 
+  it("returns 304 for weak, wildcard, and list If-None-Match validators", async () => {
+    const etag = await etagFor(body);
+    for (const header of [`W/${etag}`, `"deadbeef", ${etag}`, "*"]) {
+      const res = await respondFeed(
+        new Request("https://heyclau.de/feed.xml", {
+          headers: { "if-none-match": header },
+        }),
+        body,
+        lastBuilt,
+      );
+      expect(res.status).toBe(304);
+      expect(await res.text()).toBe("");
+    }
+  });
+
   it("returns 200 when If-None-Match does not match", async () => {
     const res = await respondFeed(
       new Request("https://heyclau.de/feed.xml", { headers: { "if-none-match": '"deadbeef"' } }),
