@@ -9,6 +9,7 @@ import {
   readRequestTextWithinLimit,
 } from "@/lib/api-security";
 import { logApiWarn } from "@/lib/api-logs";
+import { joinAnalyticsUpstreamUrl, scrubSensitiveAnalyticsBody } from "@/lib/analytics-proxy";
 import { getEnvString } from "@/lib/cloudflare-env.server";
 
 const BODY_LIMIT_BYTES = 16 * 1024;
@@ -17,58 +18,6 @@ const RATE_LIMIT = {
   limit: 60,
   windowMs: 60_000,
 } as const;
-
-const SENSITIVE_SEARCH_PARAMS_BY_PATH: Record<string, readonly string[]> = {
-  "/brief/approve": ["token"],
-};
-
-function scrubSensitiveUrlSearch(rawUrl: unknown): unknown {
-  if (typeof rawUrl !== "string") return rawUrl;
-
-  let url: URL;
-  try {
-    url = new URL(rawUrl, "https://heyclau.de");
-  } catch {
-    return rawUrl;
-  }
-
-  const sensitiveParams = SENSITIVE_SEARCH_PARAMS_BY_PATH[url.pathname];
-  if (!sensitiveParams) return rawUrl;
-
-  let changed = false;
-  for (const param of sensitiveParams) {
-    if (url.searchParams.has(param)) {
-      url.searchParams.set(param, "[redacted]");
-      changed = true;
-    }
-  }
-  if (!changed) return rawUrl;
-
-  return rawUrl.startsWith("http://") || rawUrl.startsWith("https://")
-    ? url.toString()
-    : `${url.pathname}${url.search}${url.hash}`;
-}
-
-function scrubSensitiveAnalyticsBody(body: string): string {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(body);
-  } catch {
-    return body;
-  }
-
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return body;
-  const event = parsed as { payload?: { url?: unknown } };
-  if (!event.payload || typeof event.payload !== "object" || Array.isArray(event.payload)) {
-    return body;
-  }
-
-  const scrubbedUrl = scrubSensitiveUrlSearch(event.payload.url);
-  if (scrubbedUrl === event.payload.url) return body;
-
-  event.payload.url = scrubbedUrl;
-  return JSON.stringify(event);
-}
 
 function getRequestId(request: Request) {
   return (
@@ -127,7 +76,7 @@ export async function POST(request: Request): Promise<Response> {
 
   let response: Response;
   try {
-    response = await fetch(`${upstream}/api/send`, {
+    response = await fetch(joinAnalyticsUpstreamUrl(upstream, "/api/send"), {
       method: "POST",
       headers,
       body: scrubSensitiveAnalyticsBody(body),

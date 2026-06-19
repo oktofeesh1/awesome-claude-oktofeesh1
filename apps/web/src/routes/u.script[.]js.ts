@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+import { joinAnalyticsUpstreamUrl } from "@/lib/analytics-proxy";
 import { getEnvString } from "@/lib/cloudflare-env.server";
 
 /**
@@ -13,30 +14,32 @@ import { getEnvString } from "@/lib/cloudflare-env.server";
  * script directory (`/u/api/send`, see u.api.send.ts) — keeping both out of the
  * product `/api/` namespace and its central-router contract.
  */
+export async function GET(): Promise<Response> {
+  const upstream = getEnvString("UMAMI_UPSTREAM_URL");
+  if (!upstream) return new Response("", { status: 404 });
+  try {
+    const response = await fetch(joinAnalyticsUpstreamUrl(upstream, "/script.js"), {
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) return new Response("", { status: 502 });
+    const body = await response.text();
+    return new Response(body, {
+      status: 200,
+      headers: {
+        "content-type": "application/javascript; charset=utf-8",
+        // Tracker changes rarely; cache at the edge + browser for a day.
+        "cache-control": "public, max-age=86400, s-maxage=86400",
+      },
+    });
+  } catch {
+    return new Response("", { status: 502 });
+  }
+}
+
 export const Route = createFileRoute("/u/script.js")({
   server: {
     handlers: {
-      GET: async () => {
-        const upstream = getEnvString("UMAMI_UPSTREAM_URL");
-        if (!upstream) return new Response("", { status: 404 });
-        try {
-          const response = await fetch(`${upstream}/script.js`, {
-            signal: AbortSignal.timeout(8000),
-          });
-          if (!response.ok) return new Response("", { status: 502 });
-          const body = await response.text();
-          return new Response(body, {
-            status: 200,
-            headers: {
-              "content-type": "application/javascript; charset=utf-8",
-              // Tracker changes rarely; cache at the edge + browser for a day.
-              "cache-control": "public, max-age=86400, s-maxage=86400",
-            },
-          });
-        } catch {
-          return new Response("", { status: 502 });
-        }
-      },
+      GET: async () => GET(),
     },
   },
 });

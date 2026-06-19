@@ -983,6 +983,68 @@ describe("umami collector proxy security", () => {
     expect(String(init.body)).not.toContain("signed-secret");
   });
 
+  it("redacts common sensitive analytics URL params on every path", async () => {
+    const fetchMock = vi.fn(async () => new Response("ok", { status: 202 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { POST } = await import("../apps/web/src/routes/u.api.send");
+
+    const response = await POST(
+      analyticsRequest(
+        JSON.stringify({
+          type: "event",
+          payload: {
+            website: "site-id",
+            url: "/entry/mcp/example?token=signed-secret&email=reader@example.com&code=oauth-code&state=nonce&view=full",
+          },
+        }),
+      ),
+    );
+
+    expect(response.status).toBe(202);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const init = fetchMock.mock.calls[0]?.[1] as RequestInit;
+    const forwarded = String(init.body);
+    expect(forwarded).toContain("token=%5Bredacted%5D");
+    expect(forwarded).toContain("email=%5Bredacted%5D");
+    expect(forwarded).toContain("code=%5Bredacted%5D");
+    expect(forwarded).toContain("state=%5Bredacted%5D");
+    expect(forwarded).toContain("view=full");
+    expect(forwarded).not.toContain("signed-secret");
+    expect(forwarded).not.toContain("reader@example.com");
+    expect(forwarded).not.toContain("oauth-code");
+    expect(forwarded).not.toContain("nonce");
+  });
+
+  it("normalizes trailing slashes when forwarding collector events", async () => {
+    process.env.UMAMI_UPSTREAM_URL = "https://umami.example/";
+    const fetchMock = vi.fn(async () => new Response("ok", { status: 202 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { POST } = await import("../apps/web/src/routes/u.api.send");
+
+    const response = await POST(analyticsRequest('{"payload":{}}'));
+
+    expect(response.status).toBe(202);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://umami.example/api/send");
+  });
+
+  it("normalizes trailing slashes when fetching the tracker script", async () => {
+    process.env.UMAMI_UPSTREAM_URL = "https://umami.example/";
+    const fetchMock = vi.fn(
+      async () => new Response("console.log('ok')", { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const { GET } = await import("../apps/web/src/routes/u.script[.]js");
+
+    const response = await GET();
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "https://umami.example/script.js",
+    );
+  });
+
   it("rate-limits repeated analytics posts per client", async () => {
     const fetchMock = vi.fn(async () => new Response("ok", { status: 202 }));
     vi.stubGlobal("fetch", fetchMock);
