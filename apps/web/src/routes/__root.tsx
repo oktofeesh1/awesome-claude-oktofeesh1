@@ -229,8 +229,8 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <WatchProvider>
-          <RecentsProvider>
+        <RecentsProvider>
+          <WatchProvider>
             <CompareProvider>
               <ShortcutsProvider>
                 <div className="flex min-h-screen flex-col bg-background">
@@ -256,8 +256,8 @@ function RootComponent() {
                 />
               </ShortcutsProvider>
             </CompareProvider>
-          </RecentsProvider>
-        </WatchProvider>
+          </WatchProvider>
+        </RecentsProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );
