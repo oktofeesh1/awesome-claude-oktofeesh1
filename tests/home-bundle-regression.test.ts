@@ -29,7 +29,9 @@ function resolveImport(fromFile: string, specifier: string) {
 function staticImportSpecifiers(filePath: string) {
   const source = readFileSync(filePath, "utf8");
   const specifiers: string[] = [];
-  const normalized = source.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+  const normalized = source
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/\/\/.*$/gm, "");
   const importPattern =
     /^\s*import\s+(?!type\b)(?:[\s\S]*?\s+from\s+)?["']([^"']+)["'];?/gm;
   const exportPattern =
@@ -67,7 +69,9 @@ describe("home client bundle boundaries", () => {
   it("keeps registry data out of the static home import graph", () => {
     const graph = staticImportGraph(path.join(srcRoot, "routes/index.tsx"));
     const dataModules = graph
-      .map((filePath) => path.relative(repoRoot, filePath).replaceAll(path.sep, "/"))
+      .map((filePath) =>
+        path.relative(repoRoot, filePath).replaceAll(path.sep, "/"),
+      )
       .filter(
         (filePath) =>
           filePath.startsWith("apps/web/src/data/") ||
