@@ -32,6 +32,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { CATEGORIES, type Category, type Entry } from "@/types/registry";
 import { absoluteUrl } from "@/lib/seo";
 import { ogImageUrl } from "@/lib/og-image";
+import { filterRecentPulseEntries } from "@/lib/ecosystem-pulse-window";
 
 // Home featured/brief/stats are computed server-side so the ~1 MB registry dataset stays out of
 // the / route's client chunk (the dataset is dynamically imported inside this server handler only).
@@ -42,7 +43,8 @@ const loadHomeData = createServerFn({ method: "GET" }).handler(async () => {
   const { CONTRIBUTORS } = await import("@/data/contributors");
   const categoryCounts: Record<string, number> = {};
   for (const e of ENTRIES) categoryCounts[e.category] = (categoryCounts[e.category] ?? 0) + 1;
-  const pulseCounts = CHANGELOG.reduce(
+  const recentChangelog = filterRecentPulseEntries(CHANGELOG);
+  const pulseCounts = recentChangelog.reduce(
     (acc, c) => {
       acc[c.kind] = (acc[c.kind] ?? 0) + 1;
       return acc;
@@ -65,7 +67,7 @@ const loadHomeData = createServerFn({ method: "GET" }).handler(async () => {
     registryGeneratedAt: REGISTRY_GENERATED_AT,
     brief: BRIEF_ISSUES[0] ?? null,
     pulse: {
-      recent: CHANGELOG.slice(0, 4).map((item) => ({
+      recent: recentChangelog.slice(0, 4).map((item) => ({
         ref: item.ref,
         kind: item.kind,
         category: item.category,
