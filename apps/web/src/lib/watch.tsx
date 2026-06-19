@@ -180,7 +180,10 @@ export function WatchProvider({ children }: { children: React.ReactNode }) {
   const [eventEntriesByRef, setEventEntriesByRef] = React.useState<Map<string, Entry>>(
     () => new Map(),
   );
-  const savedSearches = React.useMemo(() => activeInAppSavedSearches(recents.saved), [recents.saved]);
+  const savedSearches = React.useMemo(
+    () => activeInAppSavedSearches(recents.saved),
+    [recents.saved],
+  );
   const savedSearchesKey = React.useMemo(
     () => savedSearchSignature(savedSearches),
     [savedSearches],

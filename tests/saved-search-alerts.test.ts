@@ -12,7 +12,8 @@ const entry: SavedSearchAlertEntry = {
   category: "mcp",
   slug: "postgres-memory",
   title: "Postgres Memory MCP",
-  description: "A source-backed memory server for Postgres-backed Claude workflows.",
+  description:
+    "A source-backed memory server for Postgres-backed Claude workflows.",
   author: "Example Maintainer",
   tags: ["database", "memory"],
   keywords: ["postgres mcp", "repository memory"],
@@ -21,7 +22,9 @@ const entry: SavedSearchAlertEntry = {
   source: "source-backed",
 };
 
-function search(overrides: Partial<SavedSearchAlertSearch> = {}): SavedSearchAlertSearch {
+function search(
+  overrides: Partial<SavedSearchAlertSearch> = {},
+): SavedSearchAlertSearch {
   return {
     id: "s-1",
     label: "Postgres memory",
@@ -36,8 +39,14 @@ describe("saved-search in-app alert matching", () => {
     expect(
       activeInAppSavedSearches([
         search(),
-        search({ id: "email", alerts: { enabled: true, channels: ["email"], cadence: "daily" } }),
-        search({ id: "off", alerts: { enabled: false, channels: ["inapp"], cadence: "daily" } }),
+        search({
+          id: "email",
+          alerts: { enabled: true, channels: ["email"], cadence: "daily" },
+        }),
+        search({
+          id: "off",
+          alerts: { enabled: false, channels: ["inapp"], cadence: "daily" },
+        }),
       ]).map((item) => item.id),
     ).toEqual(["s-1"]);
   });
@@ -49,13 +58,24 @@ describe("saved-search in-app alert matching", () => {
   });
 
   it("honors category, platform, trust, and source filters", () => {
-    expect(savedSearchMatchesEntry(search({ category: "mcp", platform: "claude-code" }), entry)).toBe(
-      true,
+    expect(
+      savedSearchMatchesEntry(
+        search({ category: "mcp", platform: "claude-code" }),
+        entry,
+      ),
+    ).toBe(true);
+    expect(savedSearchMatchesEntry(search({ category: "skills" }), entry)).toBe(
+      false,
     );
-    expect(savedSearchMatchesEntry(search({ category: "skills" }), entry)).toBe(false);
-    expect(savedSearchMatchesEntry(search({ platform: "cursor" }), entry)).toBe(false);
-    expect(savedSearchMatchesEntry(search({ trust: "review" }), entry)).toBe(false);
-    expect(savedSearchMatchesEntry(search({ source: "external" }), entry)).toBe(false);
+    expect(savedSearchMatchesEntry(search({ platform: "cursor" }), entry)).toBe(
+      false,
+    );
+    expect(savedSearchMatchesEntry(search({ trust: "review" }), entry)).toBe(
+      false,
+    );
+    expect(savedSearchMatchesEntry(search({ source: "external" }), entry)).toBe(
+      false,
+    );
   });
 
   it("materializes matching public entry events into saved-search alerts", () => {

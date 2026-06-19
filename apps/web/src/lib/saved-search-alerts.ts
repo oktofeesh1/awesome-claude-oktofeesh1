@@ -166,7 +166,10 @@ export function savedSearchMatchesEntry(
   if (search.category && entry.category !== search.category) return false;
   if (search.trust && entry.trust !== search.trust) return false;
   if (search.source && entry.source !== search.source) return false;
-  if (search.platform && !(entry.platforms ?? []).some((platform) => platform === search.platform)) {
+  if (
+    search.platform &&
+    !(entry.platforms ?? []).some((platform) => platform === search.platform)
+  ) {
     return false;
   }
   return savedSearchQueryMatchesEntry(entry, search.q);
