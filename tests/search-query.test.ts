@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   countSearchResults,
+  entryMatchesTrustSignal,
   filterSearchEntries,
   matchesEntryQuery,
   normalizeSearchQuery,
@@ -104,5 +105,53 @@ describe("entry search filters", () => {
 
     expect(filterSearchEntries(filters, entries)).toEqual([safetySkill]);
     expect(countSearchResults(filters, entries)).toBe(1);
+  });
+
+  it("filters entries by trust signal quick chips", () => {
+    const sourceBacked = entry({
+      slug: "source-backed",
+      source: "source-backed",
+    });
+    const disclosed = entry({
+      slug: "disclosed",
+      safetyNotes: "Runs local shell commands.",
+      privacyNotes: "Reads local project files.",
+      trustSignals: {
+        hasSafetyNotes: true,
+        hasPrivacyNotes: true,
+      },
+    });
+    const packageEntry = entry({
+      slug: "package",
+      downloadSha256: "abc123",
+      packageVerified: true,
+      downloadTrust: "first-party",
+      trustSignals: {
+        checksumPresent: true,
+        packageTrust: "first-party",
+        packageVerified: true,
+      },
+    });
+    const reviewed = entry({
+      slug: "reviewed",
+      reviewed: true,
+      claimStatus: "verified",
+    });
+    const entries = [sourceBacked, disclosed, packageEntry, reviewed];
+
+    expect(entryMatchesTrustSignal(disclosed, "safety-notes")).toBe(true);
+    expect(filterSearchEntries({ signal: "privacy-notes" }, entries)).toEqual([
+      disclosed,
+    ]);
+    expect(filterSearchEntries({ signal: "source-backed" }, entries)).toEqual([
+      sourceBacked,
+    ]);
+    expect(filterSearchEntries({ signal: "trusted-package" }, entries)).toEqual(
+      [packageEntry],
+    );
+    expect(filterSearchEntries({ signal: "checksums" }, entries)).toEqual([
+      packageEntry,
+    ]);
+    expect(countSearchResults({ signal: "reviewed" }, entries)).toBe(1);
   });
 });

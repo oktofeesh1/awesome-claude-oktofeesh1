@@ -198,6 +198,7 @@ export interface Entry extends Provenance, BrandInfo, SkillFields {
   /** SHA-256 checksum for downloadable package, if any. */
   downloadSha256?: string;
   downloadUrl?: string;
+  downloadTrust?: string | null;
   packageVerified?: boolean;
   usageSnippet?: string;
   copySnippet?: string;
