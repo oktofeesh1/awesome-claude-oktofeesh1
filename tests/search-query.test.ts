@@ -112,6 +112,17 @@ describe("entry search filters", () => {
       slug: "source-backed",
       source: "source-backed",
     });
+    const sourceSignal = entry({
+      slug: "source-signal",
+      source: "external",
+      trustSignals: {
+        sourceStatus: "available",
+      },
+    });
+    const external = entry({
+      slug: "external",
+      source: "external",
+    });
     const disclosed = entry({
       slug: "disclosed",
       safetyNotes: "Runs local shell commands.",
@@ -137,14 +148,23 @@ describe("entry search filters", () => {
       reviewed: true,
       claimStatus: "verified",
     });
-    const entries = [sourceBacked, disclosed, packageEntry, reviewed];
+    const entries = [
+      sourceBacked,
+      sourceSignal,
+      external,
+      disclosed,
+      packageEntry,
+      reviewed,
+    ];
 
     expect(entryMatchesTrustSignal(disclosed, "safety-notes")).toBe(true);
+    expect(entryMatchesTrustSignal(external, "source-backed")).toBe(false);
     expect(filterSearchEntries({ signal: "privacy-notes" }, entries)).toEqual([
       disclosed,
     ]);
     expect(filterSearchEntries({ signal: "source-backed" }, entries)).toEqual([
       sourceBacked,
+      sourceSignal,
     ]);
     expect(filterSearchEntries({ signal: "trusted-package" }, entries)).toEqual(
       [packageEntry],

@@ -173,7 +173,7 @@ function hasPrivacyNotes(entry: Entry) {
 }
 
 function hasSourceBackedSignal(entry: Entry) {
-  return entry.source !== "unverified" || entry.trustSignals?.sourceStatus === "available";
+  return entry.source === "source-backed" || entry.trustSignals?.sourceStatus === "available";
 }
 
 function hasTrustedPackageSignal(entry: Entry) {
