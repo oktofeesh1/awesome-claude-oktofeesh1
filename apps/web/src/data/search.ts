@@ -1,5 +1,11 @@
 import { ENTRIES, entryByRef } from "./entries";
 import { sameEntry } from "@/lib/entry-identity";
+import { expandedTokenCandidates } from "@/lib/search-query-aliases";
+import {
+  normalizeSearchQuery,
+  TOKEN_SPLIT_PATTERN,
+  tokenizeSearchQuery,
+} from "@/lib/search-query-tokenization";
 import type {
   Category,
   Entry,
@@ -32,26 +38,6 @@ export const TRUST_SIGNAL_FILTERS = [
 
 export type TrustSignalFilter = (typeof TRUST_SIGNAL_FILTERS)[number];
 
-const TOKEN_SPLIT_PATTERN = /[^a-z0-9+#.-]+/i;
-const MAX_QUERY_LENGTH = 256;
-const MAX_QUERY_TOKENS = 12;
-
-const QUERY_ALIASES: Record<string, string[]> = {
-  browser: ["chrome", "playwright", "web"],
-  cc: ["claude", "claude-code"],
-  claude: ["claude-code"],
-  gh: ["github"],
-  mcp: ["model-context-protocol"],
-  repo: ["repository", "github"],
-  repos: ["repository", "github"],
-  safe: ["safety", "security", "secure", "trust", "privacy"],
-  security: ["safe", "safety", "secure", "trust"],
-  skill: ["skills"],
-  skills: ["skill"],
-  statusline: ["statuslines", "status"],
-  statuslines: ["statusline", "status"],
-};
-
 interface EntrySearchProfile {
   haystack: string;
   words: string[];
@@ -68,28 +54,7 @@ interface PreparedSearchFilters extends SearchFilters {
 
 const ENTRY_SEARCH_PROFILES = new WeakMap<Entry, EntrySearchProfile>();
 
-export function normalizeSearchQuery(query: string) {
-  return query.slice(0, MAX_QUERY_LENGTH).trim().toLowerCase();
-}
-
-function tokenizeSearchQuery(query: string) {
-  const tokens: string[] = [];
-  let token = "";
-
-  for (let index = 0; index < query.length && tokens.length < MAX_QUERY_TOKENS; index += 1) {
-    const char = query[index]!;
-    if (/[a-z0-9+#.-]/i.test(char)) {
-      token += char.toLowerCase();
-      continue;
-    }
-
-    if (token.length >= 2) tokens.push(token);
-    token = "";
-  }
-
-  if (tokens.length < MAX_QUERY_TOKENS && token.length >= 2) tokens.push(token);
-  return tokens;
-}
+export { normalizeSearchQuery } from "@/lib/search-query-tokenization";
 
 function querySearchProfile(query: string): QuerySearchProfile | null {
   const normalizedQuery = normalizeSearchQuery(query);
@@ -99,10 +64,6 @@ function querySearchProfile(query: string): QuerySearchProfile | null {
   if (!tokens.length) return null;
 
   return { normalizedQuery, tokens };
-}
-
-function expandedTokenCandidates(token: string) {
-  return [token, ...(QUERY_ALIASES[token] ?? [])];
 }
 
 function normalizedSearchText(entry: Entry) {
