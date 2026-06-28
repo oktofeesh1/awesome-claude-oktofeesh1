@@ -420,6 +420,11 @@ export interface Integration {
 
 /* -------- Contributor -------- */
 
+export interface ContributorCategorySummary {
+  category: Category;
+  count: number;
+}
+
 export interface Contributor {
   slug: string;
   handle: string;
@@ -428,6 +433,9 @@ export interface Contributor {
   bio?: string;
   github?: string;
   acceptedCount: number;
+  reviewedCount?: number;
+  sourceSubmissionCount?: number;
+  categories?: ContributorCategorySummary[];
 }
 
 /* -------- Changelog / artifact contracts -------- */
